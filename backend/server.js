@@ -15,6 +15,8 @@ app.get("/api/health", (req, res) => {
     });
 });
 
+
+
 connectDB();
 
 app.listen(PORT, () => {

@@ -1,6 +1,8 @@
 import express from "express";
 import { google } from "googleapis";
 import oauth2Client from "../config/googleOAuth.js";
+import User from "../models/User.js";
+
 const router = express.Router();
 
 router.get("/google", (req, res) => {
@@ -38,15 +40,24 @@ router.get("/google/callback", async (req, res) => {
         });
 
         const { data } = await oauth2.userinfo.get();
+        let user = await User.findOne({
+            googleId: data.id
+        });
 
+        if (!user) {
+            user = await User.create({
+                googleId: data.id,
+                name: data.name,
+                email: data.email
+            });
+        }
         res.json({
             success: true,
             message: "Google authentication successful",
             user: {
-                id: data.id,
-                name: data.name,
-                email: data.email,
-                picture: data.picture
+                id: user._id,
+                name: user.name,
+                email: user.email
             }
         });
     } catch (error) {

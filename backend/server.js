@@ -5,6 +5,9 @@ import connectDB from "./config/db.js";
 import { sendSuccess } from "./utils/apiResponse.js";
 import errorHandler from "./middleware/errorHandler.js";
 import authRoutes from "./routes/authRoutes.js";
+import authMiddleware from "./middleware/authMiddleware.js";
+
+
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
 const app = express();
@@ -15,6 +18,15 @@ app.get("/api/health", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+
+app.get("/api/test-protected", authMiddleware, (req, res) => {
+    res.json({
+        success: true,
+        message: "You accessed a protected route",
+        userId: req.userId
+    });
+});
+
 
 connectDB();
 

@@ -2,7 +2,7 @@ import express from "express";
 import { google } from "googleapis";
 import oauth2Client from "../config/googleOAuth.js";
 import User from "../models/User.js";
-
+import generateToken from "../utils/jwt.js";
 const router = express.Router();
 
 router.get("/google", (req, res) => {
@@ -51,9 +51,11 @@ router.get("/google/callback", async (req, res) => {
                 email: data.email
             });
         }
+        const token = generateToken(user._id);
         res.json({
             success: true,
             message: "Google authentication successful",
+            token,
             user: {
                 id: user._id,
                 name: user.name,

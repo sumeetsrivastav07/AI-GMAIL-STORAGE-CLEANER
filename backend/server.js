@@ -5,6 +5,9 @@ import connectDB from "./config/db.js";
 import { sendSuccess } from "./utils/apiResponse.js";
 import errorHandler from "./middleware/errorHandler.js";
 import authRoutes from "./routes/authRoutes.js";
+import gmailRoutes from "./routes/gmailRoutes.js";
+
+
 
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
@@ -17,6 +20,7 @@ app.get("/api/health", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/gmail", gmailRoutes);
 
 connectDB();
 

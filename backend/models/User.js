@@ -7,7 +7,7 @@ const userSchema = new mongoose.Schema(
             required: true,
             unique: true
         },
-        
+
         name: {
             type: String,
             required: true,
@@ -20,11 +20,13 @@ const userSchema = new mongoose.Schema(
             unique: true,
             trim: true,
             lowercase: true
+        },
+
+        googleRefreshToken: {
+            type: String
         }
     },
-    {
-        timestamps: true
-    }
+    { timestamps: true }
 );
 
 const User = mongoose.model("User", userSchema);

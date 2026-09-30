@@ -8,10 +8,12 @@ const router = express.Router();
 router.get("/google", (req, res) => {
     const authorizationUrl = oauth2Client.generateAuthUrl({
         access_type: "offline",
+        prompt: "consent",
         scope: [
             "openid",
             "email",
-            "profile"
+            "profile",
+            "https://www.googleapis.com/auth/gmail.modify"
         ],
         include_granted_scopes: true
     });
@@ -40,16 +42,18 @@ router.get("/google/callback", async (req, res) => {
         });
 
         const { data } = await oauth2.userinfo.get();
-        let user = await User.findOne({
-            googleId: data.id
-        });
+        let user = await User.findOne({ googleId: data.id });
 
         if (!user) {
             user = await User.create({
                 googleId: data.id,
                 name: data.name,
-                email: data.email
+                email: data.email,
+                googleRefreshToken: tokens.refresh_token
             });
+        } else if (tokens.refresh_token) {
+            user.googleRefreshToken = tokens.refresh_token;
+            await user.save();
         }
         const token = generateToken(user._id);
         res.json({

@@ -35,8 +35,20 @@ const emailSchema = new mongoose.Schema(
         labels: {
             type: [String],
             default: []
+        },
+        category: {
+            type: String,
+            enum: [
+                "promotional",
+                "newsletter",
+                "important",
+                "social",
+                "other"
+            ],
+            default: "other"
         }
     },
+
     { timestamps: true }
 );
 

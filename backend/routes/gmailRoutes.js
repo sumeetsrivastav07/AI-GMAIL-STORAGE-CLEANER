@@ -4,6 +4,7 @@ import getGmailClient from "../services/gmailService.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 import parseEmailMetadata from "../utils/emailParser.js";
 import Email from "../models/Email.js";
+import classifyEmail from "../services/emailClassifier.js";
 
 const router = express.Router();
 
@@ -76,7 +77,14 @@ router.get("/messages", authMiddleware, async (req, res) => {
                     ]
                 });
 
-                return parseEmailMetadata(response.data);
+                const parsedEmail = parseEmailMetadata(response.data);
+
+                const category = classifyEmail(parsedEmail);
+
+                return {
+                    ...parsedEmail,
+                    category
+                };
             })
         );
         const emailsToSave = emailMetadata.map((email) => ({
@@ -147,6 +155,45 @@ router.get("/messages/:messageId", authMiddleware, async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Failed to fetch Gmail message"
+        });
+    }
+});
+
+router.get("/emails", authMiddleware, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        const { category } = req.query;
+
+        const filter = {
+            userId: user._id
+        };
+
+        if (category) {
+            filter.category = category;
+        }
+
+        const emails = await Email.find(filter)
+            .sort({ date: -1 });
+
+        res.json({
+            success: true,
+            message: "Emails fetched successfully",
+            data: emails
+        });
+    } catch (error) {
+        console.error("Email filtering failed:", error.message);
+
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch emails"
         });
     }
 });

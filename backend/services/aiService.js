@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import validateEmailCategory from "../utils/validateEmailCategory.js";
 
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY
@@ -23,7 +24,9 @@ Return only the category name.
         `
     });
 
-    return response.text.trim().toLowerCase();
+    const category = response.text.trim().toLowerCase();
+
+    return validateEmailCategory(category);
 };
 
 export default classifyEmailWithAI;

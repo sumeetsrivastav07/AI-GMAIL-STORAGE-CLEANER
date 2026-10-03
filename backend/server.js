@@ -8,7 +8,7 @@ import authRoutes from "./routes/authRoutes.js";
 import gmailRoutes from "./routes/gmailRoutes.js";
 import whitelistRoutes from "./routes/whitelistRoutes.js";
 import ruleRoutes from "./routes/ruleRoutes.js";
-
+import protectedEmailRoutes from "./routes/protectedEmailRoutes.js";
 
 
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
@@ -26,6 +26,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/gmail", gmailRoutes);
 app.use("/api/whitelist", whitelistRoutes);
 app.use("/api/rules", ruleRoutes);
+app.use("/api/protected-emails", protectedEmailRoutes);
 
 
 connectDB();

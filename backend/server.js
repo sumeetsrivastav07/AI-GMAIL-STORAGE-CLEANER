@@ -7,7 +7,7 @@ import errorHandler from "./middleware/errorHandler.js";
 import authRoutes from "./routes/authRoutes.js";
 import gmailRoutes from "./routes/gmailRoutes.js";
 import whitelistRoutes from "./routes/whitelistRoutes.js";
-
+import ruleRoutes from "./routes/ruleRoutes.js";
 
 
 
@@ -25,7 +25,7 @@ app.get("/api/health", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/gmail", gmailRoutes);
 app.use("/api/whitelist", whitelistRoutes);
-
+app.use("/api/rules", ruleRoutes);
 
 
 connectDB();

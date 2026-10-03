@@ -5,6 +5,7 @@ import authMiddleware from "../middleware/authMiddleware.js";
 import parseEmailMetadata from "../utils/emailParser.js";
 import Email from "../models/Email.js";
 import classifyEmail from "../services/emailClassifier.js";
+import classifyEmailWithAI from "../services/aiService.js";
 
 const router = express.Router();
 
@@ -59,7 +60,7 @@ router.get("/messages", authMiddleware, async (req, res) => {
 
         const listResponse = await gmail.users.messages.list({
             userId: "me",
-            maxResults: 10
+            maxResults: 5
         });
 
         const messages = listResponse.data.messages || [];
@@ -78,12 +79,39 @@ router.get("/messages", authMiddleware, async (req, res) => {
                 });
 
                 const parsedEmail = parseEmailMetadata(response.data);
+                const existingEmail = await Email.findOne({
+                    userId: user._id,
+                    messageId: parsedEmail.messageId
+                });
+                let category;
+                let aiClassified = false;
 
-                const category = classifyEmail(parsedEmail);
+                if (existingEmail?.aiClassified) {
+                    category = existingEmail.category;
+                    aiClassified = true;
+                } else {
+                    try {
+                        category = await classifyEmailWithAI({
+                            sender: parsedEmail.sender,
+                            subject: parsedEmail.subject
+                        });
+
+                        aiClassified = true;
+                    } catch (error) {
+                        console.error(
+                            "AI classification failed:",
+                            error.message
+                        );
+
+                        category = classifyEmail(parsedEmail);
+                    }
+                }
+
 
                 return {
                     ...parsedEmail,
-                    category
+                    category,
+                    aiClassified
                 };
             })
         );

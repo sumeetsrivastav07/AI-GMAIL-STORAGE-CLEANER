@@ -36,6 +36,7 @@ const emailSchema = new mongoose.Schema(
             type: [String],
             default: []
         },
+
         category: {
             type: String,
             enum: [
@@ -46,9 +47,13 @@ const emailSchema = new mongoose.Schema(
                 "other"
             ],
             default: "other"
+        },
+
+        aiClassified: {
+            type: Boolean,
+            default: false
         }
     },
-
     { timestamps: true }
 );
 

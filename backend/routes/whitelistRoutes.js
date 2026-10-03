@@ -49,4 +49,35 @@ router.post("/", authMiddleware, async (req, res) => {
     }
 });
 
+router.delete("/:sender", authMiddleware, async (req, res) => {
+    try {
+        const normalizedSender = req.params.sender.trim().toLowerCase();
+
+        const deletedSender = await Whitelist.findOneAndDelete({
+            userId: req.userId,
+            sender: normalizedSender
+        });
+
+        if (!deletedSender) {
+            return res.status(404).json({
+                success: false,
+                message: "Sender not found in whitelist"
+            });
+        }
+
+        res.json({
+            success: true,
+            message: "Sender removed from whitelist",
+            data: deletedSender
+        });
+    } catch (error) {
+        console.error("Whitelist deletion failed:", error.message);
+
+        res.status(500).json({
+            success: false,
+            message: "Failed to remove sender from whitelist"
+        });
+    }
+});
+
 export default router;

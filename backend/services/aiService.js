@@ -26,7 +26,10 @@ Return only the category name.
 
     const category = response.text.trim().toLowerCase();
 
-    return validateEmailCategory(category);
+    return {
+        category: validateEmailCategory(category),
+        aiClassified: true
+    };
 };
 
 export default classifyEmailWithAI;

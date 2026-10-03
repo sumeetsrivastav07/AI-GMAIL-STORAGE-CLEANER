@@ -91,12 +91,13 @@ router.get("/messages", authMiddleware, async (req, res) => {
                     aiClassified = true;
                 } else {
                     try {
-                        category = await classifyEmailWithAI({
+                        const aiResult = await classifyEmailWithAI({
                             sender: parsedEmail.sender,
                             subject: parsedEmail.subject
                         });
 
-                        aiClassified = true;
+                        category = aiResult.category;
+                        aiClassified = aiResult.aiClassified;
                     } catch (error) {
                         console.error(
                             "AI classification failed:",
@@ -106,7 +107,6 @@ router.get("/messages", authMiddleware, async (req, res) => {
                         category = classifyEmail(parsedEmail);
                     }
                 }
-
 
                 return {
                     ...parsedEmail,

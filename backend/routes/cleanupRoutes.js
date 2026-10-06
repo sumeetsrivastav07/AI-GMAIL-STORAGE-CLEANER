@@ -1,6 +1,9 @@
 import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
 import Email from "../models/Email.js";
+import User from "../models/User.js";
+import getGmailClient from "../services/gmailService.js";
+
 
 const router = express.Router();
 
@@ -47,5 +50,78 @@ router.post("/selection", authMiddleware, async (req, res) => {
         });
     }
 });
+
+
+router.post("/archive", authMiddleware, async (req, res) => {
+    try {
+        const { messageId } = req.body;
+
+        if (!messageId) {
+            return res.status(400).json({
+                success: false,
+                message: "Message ID is required"
+            });
+        }
+
+        const user = await User.findById(req.userId);
+
+        if (!user || !user.googleRefreshToken) {
+            return res.status(401).json({
+                success: false,
+                message: "Google account is not connected"
+            });
+        }
+
+        const email = await Email.findOne({
+            userId: req.userId,
+            messageId
+        });
+
+        if (!email) {
+            return res.status(404).json({
+                success: false,
+                message: "Email not found"
+            });
+        }
+
+        const gmail = getGmailClient(user.googleRefreshToken);
+
+        await gmail.users.messages.modify({
+            userId: "me",
+            id: messageId,
+            requestBody: {
+                removeLabelIds: ["INBOX"]
+            }
+        });
+
+        await Email.findOneAndUpdate(
+            {
+                userId: req.userId,
+                messageId
+            },
+            {
+                $pull: {
+                    labels: "INBOX"
+                }
+            }
+        );
+
+        res.json({
+            success: true,
+            message: "Email archived successfully",
+            data: {
+                messageId
+            }
+        });
+    } catch (error) {
+        console.error("Archive operation failed:", error.message);
+
+        res.status(500).json({
+            success: false,
+            message: "Failed to archive email"
+        });
+    }
+});
+
 
 export default router;

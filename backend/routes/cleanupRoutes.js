@@ -123,5 +123,70 @@ router.post("/archive", authMiddleware, async (req, res) => {
     }
 });
 
+router.post("/delete", authMiddleware, async (req, res) => {
+    try {
+        const { messageId } = req.body;
+
+        if (!messageId) {
+            return res.status(400).json({
+                success: false,
+                message: "Message ID is required"
+            });
+        }
+
+        const user = await User.findById(req.userId);
+
+        if (!user || !user.googleRefreshToken) {
+            return res.status(401).json({
+                success: false,
+                message: "Google account is not connected"
+            });
+        }
+
+        const email = await Email.findOne({
+            userId: req.userId,
+            messageId
+        });
+
+        if (!email) {
+            return res.status(404).json({
+                success: false,
+                message: "Email not found"
+            });
+        }
+
+        const gmail = getGmailClient(user.googleRefreshToken);
+
+        await gmail.users.messages.trash({
+            userId: "me",
+            id: messageId
+        });
+
+        email.labels = email.labels.filter(
+            (label) => label !== "INBOX"
+        );
+
+        if (!email.labels.includes("TRASH")) {
+            email.labels.push("TRASH");
+        }
+
+        await email.save();
+
+        res.json({
+            success: true,
+            message: "Email moved to trash successfully",
+            data: {
+                messageId
+            }
+        });
+    } catch (error) {
+        console.error("Delete operation failed:", error.message);
+
+        res.status(500).json({
+            success: false,
+            message: "Failed to delete email"
+        });
+    }
+});
 
 export default router;

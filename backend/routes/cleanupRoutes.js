@@ -188,5 +188,130 @@ router.post("/delete", authMiddleware, async (req, res) => {
         });
     }
 });
+router.post("/bulk", authMiddleware, async (req, res) => {
+    try {
+        const { messageIds, action } = req.body;
+
+        if (!Array.isArray(messageIds) || messageIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "At least one message ID is required"
+            });
+        }
+
+        if (!["archive", "delete"].includes(action)) {
+            return res.status(400).json({
+                success: false,
+                message: "Action must be archive or delete"
+            });
+        }
+
+        const uniqueMessageIds = [...new Set(messageIds)];
+
+        const user = await User.findById(req.userId);
+
+        if (!user || !user.googleRefreshToken) {
+            return res.status(401).json({
+                success: false,
+                message: "Google account is not connected"
+            });
+        }
+
+        const emails = await Email.find({
+            userId: req.userId,
+            messageId: { $in: uniqueMessageIds }
+        });
+
+        if (emails.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "No valid emails found"
+            });
+        }
+
+        const validMessageIds = emails.map(
+            (email) => email.messageId
+        );
+
+        const gmail = getGmailClient(user.googleRefreshToken);
+
+        if (action === "archive") {
+            await gmail.users.messages.batchModify({
+                userId: "me",
+                requestBody: {
+                    ids: validMessageIds,
+                    removeLabelIds: ["INBOX"]
+                }
+            });
+
+            await Email.updateMany(
+                {
+                    userId: req.userId,
+                    messageId: { $in: validMessageIds }
+                },
+                {
+                    $pull: {
+                        labels: "INBOX"
+                    }
+                }
+            );
+        }
+
+        if (action === "delete") {
+            await gmail.users.messages.batchModify({
+                userId: "me",
+                requestBody: {
+                    ids: validMessageIds,
+                    addLabelIds: ["TRASH"],
+                    removeLabelIds: ["INBOX"]
+                }
+            });
+
+            await Email.updateMany(
+                {
+                    userId: req.userId,
+                    messageId: { $in: validMessageIds }
+                },
+                {
+                    $pull: {
+                        labels: "INBOX"
+                    }
+                }
+            );
+
+            await Email.updateMany(
+                {
+                    userId: req.userId,
+                    messageId: { $in: validMessageIds }
+                },
+                {
+                    $addToSet: {
+                        labels: "TRASH"
+                    }
+                }
+            );
+        }
+
+        res.json({
+            success: true,
+            message: `Bulk ${action} operation completed`,
+            data: {
+                requestedCount: uniqueMessageIds.length,
+                processedCount: validMessageIds.length,
+                messageIds: validMessageIds
+            }
+        });
+    } catch (error) {
+        console.error(
+            "Bulk cleanup operation failed:",
+            error.message
+        );
+
+        res.status(500).json({
+            success: false,
+            message: "Failed to complete bulk cleanup operation"
+        });
+    }
+});
 
 export default router;

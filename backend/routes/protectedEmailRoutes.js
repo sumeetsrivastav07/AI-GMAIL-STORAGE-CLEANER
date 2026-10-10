@@ -1,8 +1,60 @@
 import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
 import ProtectedEmail from "../models/ProtectedEmail.js";
-
+import Email from "../models/Email.js";
 const router = express.Router();
+
+
+router.get("/", authMiddleware, async (req, res) => {
+    try {
+        const protectedEmails = await ProtectedEmail.find({
+            userId: req.userId
+        });
+
+        const messageIds = protectedEmails.map(
+            (email) => email.messageId
+        );
+
+        const emails = await Email.find({
+            userId: req.userId,
+            messageId: { $in: messageIds }
+        }).select("messageId sender subject date");
+
+        const emailMap = new Map(
+            emails.map((email) => [
+                email.messageId,
+                email
+            ])
+        );
+
+        const data = protectedEmails.map((item) => {
+            const email = emailMap.get(item.messageId);
+
+            return {
+                messageId: item.messageId,
+                sender: email?.sender || "Unknown sender",
+                subject: email?.subject || "Unknown subject",
+                date: email?.date || null
+            };
+        });
+
+        res.json({
+            success: true,
+            message: "Protected emails fetched successfully",
+            data
+        });
+    } catch (error) {
+        console.error(
+            "Protected emails fetch failed:",
+            error.message
+        );
+
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch protected emails"
+        });
+    }
+});
 
 router.post("/", authMiddleware, async (req, res) => {
     try {

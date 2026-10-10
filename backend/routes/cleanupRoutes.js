@@ -3,7 +3,7 @@ import authMiddleware from "../middleware/authMiddleware.js";
 import Email from "../models/Email.js";
 import User from "../models/User.js";
 import getGmailClient from "../services/gmailService.js";
-
+import evaluateEmailRule from "../services/ruleEvaluationService.js";
 
 const router = express.Router();
 
@@ -52,6 +52,7 @@ router.post("/selection", authMiddleware, async (req, res) => {
 });
 
 
+
 router.post("/archive", authMiddleware, async (req, res) => {
     try {
         const { messageId, confirmed } = req.body;
@@ -69,6 +70,7 @@ router.post("/archive", authMiddleware, async (req, res) => {
                 message: "Cleanup confirmation is required"
             });
         }
+
         const user = await User.findById(req.userId);
 
         if (!user || !user.googleRefreshToken) {
@@ -90,6 +92,21 @@ router.post("/archive", authMiddleware, async (req, res) => {
             });
         }
 
+        // Check protected email and whitelisted sender
+        const evaluation = await evaluateEmailRule({
+            userId: req.userId,
+            messageId,
+            sender: email.sender
+        });
+
+        if (evaluation.action === "protect") {
+            return res.status(403).json({
+                success: false,
+                message: `Cleanup blocked: ${evaluation.reason}`
+            });
+        }
+
+        // Archive the email in Gmail
         const gmail = getGmailClient(user.googleRefreshToken);
 
         await gmail.users.messages.modify({
@@ -100,17 +117,12 @@ router.post("/archive", authMiddleware, async (req, res) => {
             }
         });
 
-        await Email.findOneAndUpdate(
-            {
-                userId: req.userId,
-                messageId
-            },
-            {
-                $pull: {
-                    labels: "INBOX"
-                }
-            }
+        // Synchronize MongoDB labels
+        email.labels = email.labels.filter(
+            (label) => label !== "INBOX"
         );
+
+        await email.save();
 
         res.json({
             success: true,
@@ -168,6 +180,21 @@ router.post("/delete", authMiddleware, async (req, res) => {
             });
         }
 
+        // Check whether the email or sender is protected
+        const evaluation = await evaluateEmailRule({
+            userId: req.userId,
+            messageId,
+            sender: email.sender
+        });
+
+        if (evaluation.action === "protect") {
+            return res.status(403).json({
+                success: false,
+                message: `Cleanup blocked: ${evaluation.reason}`
+            });
+        }
+
+        // Move the email to Gmail Trash
         const gmail = getGmailClient(user.googleRefreshToken);
 
         await gmail.users.messages.trash({
@@ -175,7 +202,8 @@ router.post("/delete", authMiddleware, async (req, res) => {
             id: messageId
         });
 
-        email.labels = email.labels.filter(
+        // Synchronize MongoDB labels
+        email.labels = (email.labels || []).filter(
             (label) => label !== "INBOX"
         );
 
@@ -201,10 +229,12 @@ router.post("/delete", authMiddleware, async (req, res) => {
         });
     }
 });
+
 router.post("/bulk", authMiddleware, async (req, res) => {
     try {
         const { messageIds, action, confirmed } = req.body;
 
+        // 1. Validate message IDs
         if (!Array.isArray(messageIds) || messageIds.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -212,6 +242,7 @@ router.post("/bulk", authMiddleware, async (req, res) => {
             });
         }
 
+        // 2. Validate action
         if (!["archive", "delete"].includes(action)) {
             return res.status(400).json({
                 success: false,
@@ -219,7 +250,7 @@ router.post("/bulk", authMiddleware, async (req, res) => {
             });
         }
 
-        // Confirmation check
+        // 3. Require confirmation
         if (confirmed !== true) {
             return res.status(400).json({
                 success: false,
@@ -227,8 +258,10 @@ router.post("/bulk", authMiddleware, async (req, res) => {
             });
         }
 
+        // 4. Remove duplicate message IDs
         const uniqueMessageIds = [...new Set(messageIds)];
 
+        // 5. Find authenticated user
         const user = await User.findById(req.userId);
 
         if (!user || !user.googleRefreshToken) {
@@ -238,6 +271,7 @@ router.post("/bulk", authMiddleware, async (req, res) => {
             });
         }
 
+        // 6. Fetch only emails belonging to this user
         const emails = await Email.find({
             userId: req.userId,
             messageId: { $in: uniqueMessageIds }
@@ -250,12 +284,59 @@ router.post("/bulk", authMiddleware, async (req, res) => {
             });
         }
 
-        const validMessageIds = emails.map(
+        // 7. Evaluate protection for every selected email
+        const evaluations = await Promise.all(
+            emails.map(async (email) => {
+                const evaluation = await evaluateEmailRule({
+                    userId: req.userId,
+                    messageId: email.messageId,
+                    sender: email.sender
+                });
+
+                return {
+                    email,
+                    evaluation
+                };
+            })
+        );
+
+        // 8. Separate protected and eligible emails
+        const protectedEmails = evaluations
+            .filter(({ evaluation }) =>
+                evaluation.action === "protect"
+            )
+            .map(({ email }) => email);
+
+        const eligibleEmails = evaluations
+            .filter(({ evaluation }) =>
+                evaluation.action !== "protect"
+            )
+            .map(({ email }) => email);
+
+        const protectedSkippedMessageIds = protectedEmails.map(
             (email) => email.messageId
         );
 
+        // 9. Stop if all emails are protected
+        if (eligibleEmails.length === 0) {
+            return res.status(403).json({
+                success: false,
+                message: "All selected emails are protected or whitelisted",
+                data: {
+                    protectedSkippedCount: protectedEmails.length,
+                    protectedSkippedMessageIds
+                }
+            });
+        }
+
+        const validMessageIds = eligibleEmails.map(
+            (email) => email.messageId
+        );
+
+        // 10. Connect to Gmail
         const gmail = getGmailClient(user.googleRefreshToken);
 
+        // 11. Archive eligible emails
         if (action === "archive") {
             await gmail.users.messages.batchModify({
                 userId: "me",
@@ -278,6 +359,7 @@ router.post("/bulk", authMiddleware, async (req, res) => {
             );
         }
 
+        // 12. Move eligible emails to Trash
         if (action === "delete") {
             await gmail.users.messages.batchModify({
                 userId: "me",
@@ -313,15 +395,21 @@ router.post("/bulk", authMiddleware, async (req, res) => {
             );
         }
 
+        // 13. Return operation results
         res.json({
             success: true,
-            message: `Bulk ${action} operation completed`,
+            message: protectedEmails.length > 0
+                ? `Bulk ${action} completed; protected emails were skipped`
+                : `Bulk ${action} operation completed`,
             data: {
                 requestedCount: uniqueMessageIds.length,
                 processedCount: validMessageIds.length,
+                protectedSkippedCount: protectedEmails.length,
+                protectedSkippedMessageIds,
                 messageIds: validMessageIds
             }
         });
+
     } catch (error) {
         console.error(
             "Bulk cleanup operation failed:",
@@ -334,4 +422,5 @@ router.post("/bulk", authMiddleware, async (req, res) => {
         });
     }
 });
+
 export default router;

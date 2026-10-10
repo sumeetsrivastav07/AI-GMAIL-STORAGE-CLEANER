@@ -7,7 +7,11 @@ const evaluateEmailRule = async ({
     messageId,
     sender
 }) => {
-    const normalizedSender = sender.trim().toLowerCase();
+    const senderMatch = sender.match(/<([^<>]+)>/);
+
+    const normalizedSender = (
+        senderMatch ? senderMatch[1] : sender
+    ).trim().toLowerCase();
 
     // 1. Check if email is protected
     const protectedEmail = await ProtectedEmail.findOne({

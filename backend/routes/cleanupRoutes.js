@@ -54,7 +54,7 @@ router.post("/selection", authMiddleware, async (req, res) => {
 
 router.post("/archive", authMiddleware, async (req, res) => {
     try {
-        const { messageId } = req.body;
+        const { messageId, confirmed } = req.body;
 
         if (!messageId) {
             return res.status(400).json({
@@ -63,6 +63,12 @@ router.post("/archive", authMiddleware, async (req, res) => {
             });
         }
 
+        if (confirmed !== true) {
+            return res.status(400).json({
+                success: false,
+                message: "Cleanup confirmation is required"
+            });
+        }
         const user = await User.findById(req.userId);
 
         if (!user || !user.googleRefreshToken) {
@@ -125,12 +131,19 @@ router.post("/archive", authMiddleware, async (req, res) => {
 
 router.post("/delete", authMiddleware, async (req, res) => {
     try {
-        const { messageId } = req.body;
+        const { messageId, confirmed } = req.body;
 
         if (!messageId) {
             return res.status(400).json({
                 success: false,
                 message: "Message ID is required"
+            });
+        }
+
+        if (confirmed !== true) {
+            return res.status(400).json({
+                success: false,
+                message: "Cleanup confirmation is required"
             });
         }
 
@@ -190,7 +203,7 @@ router.post("/delete", authMiddleware, async (req, res) => {
 });
 router.post("/bulk", authMiddleware, async (req, res) => {
     try {
-        const { messageIds, action } = req.body;
+        const { messageIds, action, confirmed } = req.body;
 
         if (!Array.isArray(messageIds) || messageIds.length === 0) {
             return res.status(400).json({
@@ -203,6 +216,14 @@ router.post("/bulk", authMiddleware, async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: "Action must be archive or delete"
+            });
+        }
+
+        // Confirmation check
+        if (confirmed !== true) {
+            return res.status(400).json({
+                success: false,
+                message: "Cleanup confirmation is required"
             });
         }
 
@@ -313,5 +334,4 @@ router.post("/bulk", authMiddleware, async (req, res) => {
         });
     }
 });
-
 export default router;

@@ -450,5 +450,34 @@ router.post("/bulk", authMiddleware, async (req, res) => {
     }
 });
 
+router.get("/history", authMiddleware, async (req, res) => {
+    try {
+        const history = await CleanupHistory.find({
+            userId: req.userId
+        })
+            .sort({ createdAt: -1 })
+            .limit(50);
+
+        res.json({
+            success: true,
+            message: "Cleanup history fetched successfully",
+            data: {
+                count: history.length,
+                history
+            }
+        });
+    } catch (error) {
+        console.error(
+            "Cleanup history fetch failed:",
+            error.message
+        );
+
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch cleanup history"
+        });
+    }
+});
+
 
 export default router;

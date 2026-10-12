@@ -5,6 +5,7 @@ import User from "../models/User.js";
 import getGmailClient from "../services/gmailService.js";
 import evaluateEmailRule from "../services/ruleEvaluationService.js";
 import CleanupHistory from "../models/CleanupHistory.js";
+import mongoose from "mongoose";
 
 const router = express.Router();
 
@@ -478,6 +479,111 @@ router.get("/history", authMiddleware, async (req, res) => {
         });
     }
 });
+
+
+router.post("/undo/:historyId", authMiddleware, async (req, res) => {
+    try {
+        const { historyId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(historyId)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid history ID"
+            });
+        }
+
+        // Find this history record for the authenticated user
+        const history = await CleanupHistory.findOne({
+            _id: historyId,
+            userId: req.userId
+        });
+
+        if (!history) {
+            return res.status(404).json({
+                success: false,
+                message: "Cleanup history record not found"
+            });
+        }
+
+        if (history.status !== "completed") {
+            return res.status(409).json({
+                success: false,
+                message: "This cleanup action has already been undone"
+            });
+        }
+
+        const user = await User.findById(req.userId);
+
+        if (!user || !user.googleRefreshToken) {
+            return res.status(401).json({
+                success: false,
+                message: "Google account is not connected"
+            });
+        }
+
+        const email = await Email.findOne({
+            userId: req.userId,
+            messageId: history.messageId
+        });
+
+        if (!email) {
+            return res.status(404).json({
+                success: false,
+                message: "Email not found in database"
+            });
+        }
+
+        const gmail = getGmailClient(user.googleRefreshToken);
+
+        const previousLabels = history.previousLabels || [];
+
+        // Restore a deleted email from Gmail Trash
+        if (history.action === "delete") {
+            await gmail.users.messages.untrash({
+                userId: "me",
+                id: history.messageId
+            });
+        }
+
+        // Restore Inbox only if the email originally had that label
+        if (previousLabels.includes("INBOX")) {
+            await gmail.users.messages.modify({
+                userId: "me",
+                id: history.messageId,
+                requestBody: {
+                    addLabelIds: ["INBOX"]
+                }
+            });
+        }
+
+        // Restore the labels saved before cleanup
+        email.labels = [...previousLabels];
+        await email.save();
+
+        // Mark the history entry as undone
+        history.status = "undone";
+        history.undoneAt = new Date();
+        await history.save();
+
+        res.json({
+            success: true,
+            message: "Cleanup action undone successfully",
+            data: {
+                messageId: history.messageId,
+                action: history.action,
+                status: history.status
+            }
+        });
+    } catch (error) {
+        console.error("Cleanup undo failed:", error.message);
+
+        res.status(500).json({
+            success: false,
+            message: "Failed to undo cleanup action"
+        });
+    }
+});
+
 
 
 export default router;

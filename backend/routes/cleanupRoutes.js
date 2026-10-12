@@ -4,6 +4,7 @@ import Email from "../models/Email.js";
 import User from "../models/User.js";
 import getGmailClient from "../services/gmailService.js";
 import evaluateEmailRule from "../services/ruleEvaluationService.js";
+import CleanupHistory from "../models/CleanupHistory.js";
 
 const router = express.Router();
 
@@ -50,6 +51,7 @@ router.post("/selection", authMiddleware, async (req, res) => {
         });
     }
 });
+
 
 
 
@@ -106,6 +108,9 @@ router.post("/archive", authMiddleware, async (req, res) => {
             });
         }
 
+        // Save the original labels for future undo
+        const previousLabels = [...(email.labels || [])];
+
         // Archive the email in Gmail
         const gmail = getGmailClient(user.googleRefreshToken);
 
@@ -118,17 +123,27 @@ router.post("/archive", authMiddleware, async (req, res) => {
         });
 
         // Synchronize MongoDB labels
-        email.labels = email.labels.filter(
+        email.labels = previousLabels.filter(
             (label) => label !== "INBOX"
         );
 
         await email.save();
 
+        // Record the completed cleanup action
+        const historyEntry = await CleanupHistory.create({
+            userId: req.userId,
+            messageId,
+            action: "archive",
+            status: "completed",
+            previousLabels
+        });
+
         res.json({
             success: true,
             message: "Email archived successfully",
             data: {
-                messageId
+                messageId,
+                historyId: historyEntry._id
             }
         });
     } catch (error) {
@@ -140,6 +155,7 @@ router.post("/archive", authMiddleware, async (req, res) => {
         });
     }
 });
+
 
 router.post("/delete", authMiddleware, async (req, res) => {
     try {

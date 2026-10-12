@@ -157,6 +157,7 @@ router.post("/archive", authMiddleware, async (req, res) => {
 });
 
 
+
 router.post("/delete", authMiddleware, async (req, res) => {
     try {
         const { messageId, confirmed } = req.body;
@@ -196,7 +197,7 @@ router.post("/delete", authMiddleware, async (req, res) => {
             });
         }
 
-        // Check whether the email or sender is protected
+        // Block protected emails and whitelisted senders
         const evaluation = await evaluateEmailRule({
             userId: req.userId,
             messageId,
@@ -210,16 +211,19 @@ router.post("/delete", authMiddleware, async (req, res) => {
             });
         }
 
-        // Move the email to Gmail Trash
+        // Save the original labels for future undo
+        const previousLabels = [...(email.labels || [])];
+
         const gmail = getGmailClient(user.googleRefreshToken);
 
+        // Move the email to Gmail Trash
         await gmail.users.messages.trash({
             userId: "me",
             id: messageId
         });
 
-        // Synchronize MongoDB labels
-        email.labels = (email.labels || []).filter(
+        // Update the local email record
+        email.labels = previousLabels.filter(
             (label) => label !== "INBOX"
         );
 
@@ -229,11 +233,21 @@ router.post("/delete", authMiddleware, async (req, res) => {
 
         await email.save();
 
+        // Record the completed action
+        const historyEntry = await CleanupHistory.create({
+            userId: req.userId,
+            messageId,
+            action: "delete",
+            status: "completed",
+            previousLabels
+        });
+
         res.json({
             success: true,
             message: "Email moved to trash successfully",
             data: {
-                messageId
+                messageId,
+                historyId: historyEntry._id
             }
         });
     } catch (error) {
@@ -245,6 +259,7 @@ router.post("/delete", authMiddleware, async (req, res) => {
         });
     }
 });
+
 
 router.post("/bulk", authMiddleware, async (req, res) => {
     try {

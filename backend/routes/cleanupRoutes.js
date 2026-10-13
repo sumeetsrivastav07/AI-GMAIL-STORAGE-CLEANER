@@ -584,6 +584,61 @@ router.post("/undo/:historyId", authMiddleware, async (req, res) => {
     }
 });
 
+router.get("/stats", authMiddleware, async (req, res) => {
+    try {
+        const userId = req.userId;
+
+        const [
+            cleanedEmails,
+            archivedEmails,
+            trashedEmails,
+            undoneActions
+        ] = await Promise.all([
+            CleanupHistory.countDocuments({
+                userId,
+                status: "completed"
+            }),
+
+            CleanupHistory.countDocuments({
+                userId,
+                action: "archive",
+                status: "completed"
+            }),
+
+            CleanupHistory.countDocuments({
+                userId,
+                action: "delete",
+                status: "completed"
+            }),
+
+            CleanupHistory.countDocuments({
+                userId,
+                status: "undone"
+            })
+        ]);
+
+        res.json({
+            success: true,
+            message: "Cleanup statistics fetched successfully",
+            data: {
+                cleanedEmails,
+                archivedEmails,
+                trashedEmails,
+                undoneActions
+            }
+        });
+    } catch (error) {
+        console.error(
+            "Cleanup statistics fetch failed:",
+            error.message
+        );
+
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch cleanup statistics"
+        });
+    }
+});
 
 
 export default router;

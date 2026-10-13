@@ -18,7 +18,7 @@ const baseStats = [
         icon: "◈",
         label: "Promotional emails",
         value: "—",
-        detail: "Coming next",
+        detail: "Classified as promotional",
         color: "purple"
     },
     {
@@ -65,6 +65,7 @@ function App() {
     const [authError, setAuthError] = useState("");
 
     const [emailStats, setEmailStats] = useState(null);
+    const [categoryCounts, setCategoryCounts] = useState(null);
     const [statsLoading, setStatsLoading] = useState(false);
     const [statsError, setStatsError] = useState("");
 
@@ -72,7 +73,7 @@ function App() {
 
     const isAuthenticated = Boolean(authToken && authUser);
 
-    // Receive Google OAuth result from the login popup.
+    // Receive the Google OAuth result from the login popup.
     useEffect(() => {
         const handleAuthMessage = (event) => {
             if (event.origin !== BACKEND_ORIGIN) {
@@ -131,10 +132,11 @@ function App() {
         };
     }, []);
 
-    // Fetch real email statistics when a JWT is available.
+    // Fetch real email and category statistics.
     useEffect(() => {
         if (!authToken) {
             setEmailStats(null);
+            setCategoryCounts(null);
             setStatsLoading(false);
             setStatsError("");
             return;
@@ -166,19 +168,23 @@ function App() {
                 }
 
                 if (
-                    typeof result.data?.analyzedEmails !== "number"
+                    typeof result.data?.analyzedEmails !== "number" ||
+                    !result.data?.categoryCounts ||
+                    typeof result.data.categoryCounts !== "object"
                 ) {
                     throw new Error(
-                        "The statistics response has an invalid format"
+                        "Statistics response has an invalid format"
                     );
                 }
 
                 if (!cancelled) {
                     setEmailStats(result.data.analyzedEmails);
+                    setCategoryCounts(result.data.categoryCounts);
                 }
             } catch (error) {
                 if (!cancelled) {
                     setEmailStats(null);
+                    setCategoryCounts(null);
                     setStatsError(
                         error.message ||
                         "Could not load email statistics"
@@ -226,6 +232,7 @@ function App() {
         setAuthToken("");
         setAuthUser(null);
         setEmailStats(null);
+        setCategoryCounts(null);
         setStatsError("");
         setAuthError("");
         setIsConnecting(false);
@@ -238,24 +245,43 @@ function App() {
     };
 
     const displayStats = baseStats.map((stat, index) => {
-        if (index !== 0) {
-            return stat;
-        }
+        let value = stat.value;
+        let detail = stat.detail;
 
-        return {
-            ...stat,
-            value: statsLoading
+        if (index === 0) {
+            value = statsLoading
                 ? "..."
                 : emailStats !== null
                     ? String(emailStats)
-                    : "—",
-            detail: statsLoading
+                    : "—";
+
+            detail = statsLoading
                 ? "Loading saved records..."
                 : statsError
                     ? "Could not load count"
                     : isAuthenticated
                         ? "Saved email records"
-                        : "Sign in to view statistics"
+                        : "Sign in to view statistics";
+        }
+
+        if (index === 1) {
+            value = statsLoading
+                ? "..."
+                : categoryCounts !== null
+                    ? String(categoryCounts.promotional ?? 0)
+                    : "—";
+
+            detail = statsLoading
+                ? "Loading category count..."
+                : statsError
+                    ? "Could not load count"
+                    : "Classified as promotional";
+        }
+
+        return {
+            ...stat,
+            value,
+            detail
         };
     });
 
@@ -556,28 +582,42 @@ function App() {
                             </div>
 
                             <div className="category-list">
-                                {categories.map((category, index) => (
-                                    <div
-                                        className="category-row"
-                                        key={category}
-                                    >
-                                        <span
-                                            className={`category-dot category-${index}`}
-                                        ></span>
+                                {categories.map((category, index) => {
+                                    const key = category.toLowerCase();
 
-                                        <span className="category-name">
-                                            {category}
-                                        </span>
+                                    const count = categoryCounts?.[key];
 
-                                        <span className="category-count">
-                                            —
-                                        </span>
-                                    </div>
-                                ))}
+                                    return (
+                                        <div
+                                            className="category-row"
+                                            key={category}
+                                        >
+                                            <span
+                                                className={`category-dot category-${index}`}
+                                            ></span>
+
+                                            <span className="category-name">
+                                                {category}
+                                            </span>
+
+                                            <span className="category-count">
+                                                {statsLoading
+                                                    ? "..."
+                                                    : typeof count === "number"
+                                                        ? count
+                                                        : "—"}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
                             </div>
 
                             <p className="category-footnote">
-                                Counts will appear after API integration.
+                                {statsError
+                                    ? "Category counts could not be loaded."
+                                    : isAuthenticated
+                                        ? "Counts from your saved email records."
+                                        : "Sign in to view category counts."}
                             </p>
                         </article>
                     </section>

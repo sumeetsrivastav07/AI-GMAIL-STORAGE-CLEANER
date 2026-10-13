@@ -226,17 +226,46 @@ router.get("/emails", authMiddleware, async (req, res) => {
     }
 });
 
+
 router.get("/stats", authMiddleware, async (req, res) => {
     try {
-        const analyzedEmails = await Email.countDocuments({
-            userId: req.userId
-        });
+        const categories = [
+            "promotional",
+            "newsletter",
+            "important",
+            "social",
+            "other"
+        ];
+
+        const [analyzedEmails, categoryResults] = await Promise.all([
+            Email.countDocuments({
+                userId: req.userId
+            }),
+
+            Promise.all(
+                categories.map(async (category) => ({
+                    category,
+                    count: await Email.countDocuments({
+                        userId: req.userId,
+                        category
+                    })
+                }))
+            )
+        ]);
+
+        const categoryCounts = Object.fromEntries(
+            categoryResults.map(({ category, count }) => [
+                category,
+                count
+            ])
+        );
 
         res.json({
             success: true,
             message: "Email statistics fetched successfully",
             data: {
-                analyzedEmails
+                analyzedEmails,
+                categoryCounts
             }
         });
     } catch (error) {

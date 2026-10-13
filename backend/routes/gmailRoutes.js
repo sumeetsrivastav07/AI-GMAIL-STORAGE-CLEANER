@@ -226,4 +226,31 @@ router.get("/emails", authMiddleware, async (req, res) => {
     }
 });
 
+router.get("/stats", authMiddleware, async (req, res) => {
+    try {
+        const analyzedEmails = await Email.countDocuments({
+            userId: req.userId
+        });
+
+        res.json({
+            success: true,
+            message: "Email statistics fetched successfully",
+            data: {
+                analyzedEmails
+            }
+        });
+    } catch (error) {
+        console.error(
+            "Email statistics fetch failed:",
+            error.message
+        );
+
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch email statistics"
+        });
+    }
+});
+
+
 export default router;

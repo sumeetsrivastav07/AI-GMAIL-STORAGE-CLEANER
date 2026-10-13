@@ -1,4 +1,10 @@
+
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
+
+const BACKEND_ORIGIN = "http://localhost:5000";
+const TOKEN_KEY = "clearmail_token";
+const USER_KEY = "clearmail_user";
 
 const stats = [
     {
@@ -39,7 +45,126 @@ const categories = [
     "Other"
 ];
 
+function readStoredUser() {
+    try {
+        return JSON.parse(
+            sessionStorage.getItem(USER_KEY) || "null"
+        );
+    } catch {
+        return null;
+    }
+}
+
 function App() {
+    const [authToken, setAuthToken] = useState(
+        () => sessionStorage.getItem(TOKEN_KEY) || ""
+    );
+
+    const [authUser, setAuthUser] = useState(readStoredUser);
+    const [isConnecting, setIsConnecting] = useState(false);
+    const [authError, setAuthError] = useState("");
+
+    const popupRef = useRef(null);
+
+    const isAuthenticated = Boolean(authToken && authUser);
+
+    useEffect(() => {
+        const handleAuthMessage = (event) => {
+            // Accept messages only from our backend OAuth popup.
+            if (event.origin !== BACKEND_ORIGIN) {
+                return;
+            }
+
+            // Accept messages only from the popup we opened.
+            if (
+                !popupRef.current ||
+                event.source !== popupRef.current
+            ) {
+                return;
+            }
+
+            const result = event.data;
+
+            if (
+                result?.type === "oauth-success" &&
+                result.token &&
+                result.user
+            ) {
+                sessionStorage.setItem(
+                    TOKEN_KEY,
+                    result.token
+                );
+
+                sessionStorage.setItem(
+                    USER_KEY,
+                    JSON.stringify(result.user)
+                );
+
+                setAuthToken(result.token);
+                setAuthUser(result.user);
+                setAuthError("");
+                setIsConnecting(false);
+                popupRef.current = null;
+                return;
+            }
+
+            if (result?.type === "oauth-error") {
+                setAuthError(
+                    result.message || "Google sign-in failed."
+                );
+
+                setIsConnecting(false);
+                popupRef.current = null;
+            }
+        };
+
+        window.addEventListener("message", handleAuthMessage);
+
+        return () => {
+            window.removeEventListener(
+                "message",
+                handleAuthMessage
+            );
+        };
+    }, []);
+
+    const handleConnectGmail = () => {
+        setAuthError("");
+        setIsConnecting(true);
+
+        const popup = window.open(
+            `${BACKEND_ORIGIN}/api/auth/google`,
+            "clearmail-google-login",
+            "popup=yes,width=520,height=720"
+        );
+
+        if (!popup) {
+            setIsConnecting(false);
+            setAuthError(
+                "Sign-in popup was blocked. Allow popups and try again."
+            );
+            return;
+        }
+
+        popupRef.current = popup;
+    };
+
+    const handleSignOut = () => {
+        sessionStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(USER_KEY);
+
+        setAuthToken("");
+        setAuthUser(null);
+        setAuthError("");
+        setIsConnecting(false);
+
+        if (popupRef.current && !popupRef.current.closed) {
+            popupRef.current.close();
+        }
+
+        popupRef.current = null;
+    };
+
     return (
         <div className="app-shell">
             <aside className="sidebar">
@@ -72,7 +197,7 @@ function App() {
 
                     <div className="nav-item">
                         <span className="nav-icon">◇</span>
-                        <span>Rules & whitelist</span>
+                        <span>Rules &amp; whitelist</span>
                     </div>
                 </nav>
 
@@ -90,11 +215,22 @@ function App() {
                     </div>
 
                     <div className="workspace-profile">
-                        <div className="profile-avatar">C</div>
+                        <div className="profile-avatar">
+                            {authUser?.name
+                                ? authUser.name.charAt(0).toUpperCase()
+                                : "C"}
+                        </div>
 
                         <div>
-                            <h3>Your workspace</h3>
-                            <p>Dashboard preview</p>
+                            <h3>
+                                {authUser?.name || "Your workspace"}
+                            </h3>
+
+                            <p>
+                                {isAuthenticated
+                                    ? authUser.email
+                                    : "Not signed in"}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -106,13 +242,80 @@ function App() {
                         Workspace <span>/</span> Overview
                     </p>
 
-                    <div className="preview-status">
-                        <span className="status-dot"></span>
-                        Dashboard preview
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "14px"
+                        }}
+                    >
+                        <div className="preview-status">
+                            <span
+                                className="status-dot"
+                                style={{
+                                    background: isAuthenticated
+                                        ? "#28a779"
+                                        : "#e5a63b"
+                                }}
+                            />
+
+                            {isAuthenticated
+                                ? "Gmail connected"
+                                : "Not connected"}
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={
+                                isAuthenticated
+                                    ? handleSignOut
+                                    : handleConnectGmail
+                            }
+                            disabled={isConnecting}
+                            style={{
+                                border: "none",
+                                borderRadius: "9px",
+                                padding: "11px 15px",
+                                background: isAuthenticated
+                                    ? "#eef2f8"
+                                    : "#2259d6",
+                                color: isAuthenticated
+                                    ? "#43516a"
+                                    : "#ffffff",
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                cursor: isConnecting
+                                    ? "wait"
+                                    : "pointer",
+                                opacity: isConnecting ? 0.7 : 1
+                            }}
+                        >
+                            {isConnecting
+                                ? "Waiting for Google..."
+                                : isAuthenticated
+                                    ? "Sign out"
+                                    : "Connect Gmail"}
+                        </button>
                     </div>
                 </header>
 
                 <div className="dashboard-content">
+                    {authError && (
+                        <div
+                            role="alert"
+                            style={{
+                                marginBottom: "18px",
+                                padding: "12px 15px",
+                                borderRadius: "10px",
+                                background: "#fff0f0",
+                                color: "#b42318",
+                                fontSize: "12px"
+                            }}
+                        >
+                            {authError}
+                        </div>
+                    )}
+
                     <section className="welcome-section">
                         <div className="welcome-copy">
                             <p className="eyebrow">
@@ -130,9 +333,25 @@ function App() {
                                 activity, and keep important emails
                                 protected.
                             </p>
+
+                            {!isAuthenticated && (
+                                <p
+                                    style={{
+                                        marginTop: "12px",
+                                        fontSize: "12px",
+                                        color: "#64718b"
+                                    }}
+                                >
+                                    Connect your Google account to get
+                                    started.
+                                </p>
+                            )}
                         </div>
 
-                        <div className="welcome-visual" aria-hidden="true">
+                        <div
+                            className="welcome-visual"
+                            aria-hidden="true"
+                        >
                             <div className="visual-circle circle-one"></div>
                             <div className="visual-circle circle-two"></div>
 
@@ -256,7 +475,11 @@ function App() {
 
                     <footer className="dashboard-footer">
                         <span>ClearMail · Gmail Storage Cleaner</span>
-                        <span>Dashboard foundation</span>
+                        <span>
+                            {isAuthenticated
+                                ? "Google account connected"
+                                : "Dashboard preview"}
+                        </span>
                     </footer>
                 </div>
             </main>

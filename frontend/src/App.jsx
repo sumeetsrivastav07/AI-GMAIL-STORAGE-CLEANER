@@ -6,33 +6,33 @@ const BACKEND_ORIGIN = "http://localhost:5000";
 const TOKEN_KEY = "clearmail_token";
 const USER_KEY = "clearmail_user";
 
-const stats = [
+const baseStats = [
     {
         icon: "✉",
         label: "Emails analyzed",
         value: "—",
-        detail: "Waiting for live data",
+        detail: "Saved email records",
         color: "blue"
     },
     {
         icon: "◈",
         label: "Promotional emails",
         value: "—",
-        detail: "Waiting for live data",
+        detail: "Coming next",
         color: "purple"
     },
     {
         icon: "♡",
         label: "Protected emails",
         value: "—",
-        detail: "Waiting for live data",
+        detail: "Coming next",
         color: "green"
     },
     {
         icon: "↗",
         label: "Emails cleaned",
         value: "—",
-        detail: "Waiting for live data",
+        detail: "Coming next",
         color: "orange"
     }
 ];
@@ -64,18 +64,21 @@ function App() {
     const [isConnecting, setIsConnecting] = useState(false);
     const [authError, setAuthError] = useState("");
 
+    const [emailStats, setEmailStats] = useState(null);
+    const [statsLoading, setStatsLoading] = useState(false);
+    const [statsError, setStatsError] = useState("");
+
     const popupRef = useRef(null);
 
     const isAuthenticated = Boolean(authToken && authUser);
 
+    // Receive Google OAuth result from the login popup.
     useEffect(() => {
         const handleAuthMessage = (event) => {
-            // Accept messages only from our backend OAuth popup.
             if (event.origin !== BACKEND_ORIGIN) {
                 return;
             }
 
-            // Accept messages only from the popup we opened.
             if (
                 !popupRef.current ||
                 event.source !== popupRef.current
@@ -128,6 +131,73 @@ function App() {
         };
     }, []);
 
+    // Fetch real email statistics when a JWT is available.
+    useEffect(() => {
+        if (!authToken) {
+            setEmailStats(null);
+            setStatsLoading(false);
+            setStatsError("");
+            return;
+        }
+
+        let cancelled = false;
+
+        const fetchEmailStats = async () => {
+            setStatsLoading(true);
+            setStatsError("");
+
+            try {
+                const response = await fetch(
+                    `${BACKEND_ORIGIN}/api/gmail/stats`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${authToken}`
+                        }
+                    }
+                );
+
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    throw new Error(
+                        result.message ||
+                        "Could not fetch email statistics"
+                    );
+                }
+
+                if (
+                    typeof result.data?.analyzedEmails !== "number"
+                ) {
+                    throw new Error(
+                        "The statistics response has an invalid format"
+                    );
+                }
+
+                if (!cancelled) {
+                    setEmailStats(result.data.analyzedEmails);
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    setEmailStats(null);
+                    setStatsError(
+                        error.message ||
+                        "Could not load email statistics"
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    setStatsLoading(false);
+                }
+            }
+        };
+
+        fetchEmailStats();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [authToken]);
+
     const handleConnectGmail = () => {
         setAuthError("");
         setIsConnecting(true);
@@ -155,6 +225,8 @@ function App() {
 
         setAuthToken("");
         setAuthUser(null);
+        setEmailStats(null);
+        setStatsError("");
         setAuthError("");
         setIsConnecting(false);
 
@@ -164,6 +236,28 @@ function App() {
 
         popupRef.current = null;
     };
+
+    const displayStats = baseStats.map((stat, index) => {
+        if (index !== 0) {
+            return stat;
+        }
+
+        return {
+            ...stat,
+            value: statsLoading
+                ? "..."
+                : emailStats !== null
+                    ? String(emailStats)
+                    : "—",
+            detail: statsLoading
+                ? "Loading saved records..."
+                : statsError
+                    ? "Could not load count"
+                    : isAuthenticated
+                        ? "Saved email records"
+                        : "Sign in to view statistics"
+        };
+    });
 
     return (
         <div className="app-shell">
@@ -225,7 +319,6 @@ function App() {
                             <h3>
                                 {authUser?.name || "Your workspace"}
                             </h3>
-
                             <p>
                                 {isAuthenticated
                                     ? authUser.email
@@ -316,6 +409,22 @@ function App() {
                         </div>
                     )}
 
+                    {statsError && isAuthenticated && (
+                        <div
+                            role="alert"
+                            style={{
+                                marginBottom: "18px",
+                                padding: "12px 15px",
+                                borderRadius: "10px",
+                                background: "#fff8e8",
+                                color: "#875b12",
+                                fontSize: "12px"
+                            }}
+                        >
+                            Email statistics couldn't load: {statsError}
+                        </div>
+                    )}
+
                     <section className="welcome-section">
                         <div className="welcome-copy">
                             <p className="eyebrow">
@@ -384,7 +493,7 @@ function App() {
                         </div>
 
                         <div className="stats-grid">
-                            {stats.map((stat) => (
+                            {displayStats.map((stat) => (
                                 <article
                                     className="stat-card"
                                     key={stat.label}

@@ -10,10 +10,16 @@ import whitelistRoutes from "./routes/whitelistRoutes.js";
 import ruleRoutes from "./routes/ruleRoutes.js";
 import protectedEmailRoutes from "./routes/protectedEmailRoutes.js";
 import cleanupRoutes from "./routes/cleanupRoutes.js";
+import cors from "cors";
 
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
 const app = express();
+
+app.use(cors({
+    origin: "http://localhost:5173"
+}));
+
 app.use(express.json());
 
 const PORT = process.env.PORT || 5000;

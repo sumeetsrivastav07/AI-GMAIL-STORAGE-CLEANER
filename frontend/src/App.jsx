@@ -32,7 +32,7 @@ const baseStats = [
         icon: "↗",
         label: "Emails cleaned",
         value: "—",
-        detail: "Coming next",
+        detail: "Completed cleanup records",
         color: "orange"
     }
 ];
@@ -69,11 +69,15 @@ function App() {
     const [statsLoading, setStatsLoading] = useState(false);
     const [statsError, setStatsError] = useState("");
 
+    const [cleanupStats, setCleanupStats] = useState(null);
+    const [cleanupStatsLoading, setCleanupStatsLoading] = useState(false);
+    const [cleanupStatsError, setCleanupStatsError] = useState("");
+
     const popupRef = useRef(null);
 
     const isAuthenticated = Boolean(authToken && authUser);
 
-    // Receive the Google OAuth result from the login popup.
+    // Receive Google OAuth result from the login popup.
     useEffect(() => {
         const handleAuthMessage = (event) => {
             if (event.origin !== BACKEND_ORIGIN) {
@@ -94,11 +98,7 @@ function App() {
                 result.token &&
                 result.user
             ) {
-                sessionStorage.setItem(
-                    TOKEN_KEY,
-                    result.token
-                );
-
+                sessionStorage.setItem(TOKEN_KEY, result.token);
                 sessionStorage.setItem(
                     USER_KEY,
                     JSON.stringify(result.user)
@@ -132,7 +132,7 @@ function App() {
         };
     }, []);
 
-    // Fetch real email and category statistics.
+    // Fetch email and category statistics.
     useEffect(() => {
         if (!authToken) {
             setEmailStats(null);
@@ -204,6 +204,73 @@ function App() {
         };
     }, [authToken]);
 
+    // Fetch cleanup statistics from cleanup history.
+    useEffect(() => {
+        if (!authToken) {
+            setCleanupStats(null);
+            setCleanupStatsLoading(false);
+            setCleanupStatsError("");
+            return;
+        }
+
+        let cancelled = false;
+
+        const fetchCleanupStats = async () => {
+            setCleanupStatsLoading(true);
+            setCleanupStatsError("");
+
+            try {
+                const response = await fetch(
+                    `${BACKEND_ORIGIN}/api/cleanup/stats`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${authToken}`
+                        }
+                    }
+                );
+
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    throw new Error(
+                        result.message ||
+                        "Could not fetch cleanup statistics"
+                    );
+                }
+
+                if (
+                    typeof result.data?.cleanedEmails !== "number"
+                ) {
+                    throw new Error(
+                        "Cleanup statistics response has an invalid format"
+                    );
+                }
+
+                if (!cancelled) {
+                    setCleanupStats(result.data);
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    setCleanupStats(null);
+                    setCleanupStatsError(
+                        error.message ||
+                        "Could not load cleanup statistics"
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    setCleanupStatsLoading(false);
+                }
+            }
+        };
+
+        fetchCleanupStats();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [authToken]);
+
     const handleConnectGmail = () => {
         setAuthError("");
         setIsConnecting(true);
@@ -233,7 +300,9 @@ function App() {
         setAuthUser(null);
         setEmailStats(null);
         setCategoryCounts(null);
+        setCleanupStats(null);
         setStatsError("");
+        setCleanupStatsError("");
         setAuthError("");
         setIsConnecting(false);
 
@@ -276,6 +345,20 @@ function App() {
                 : statsError
                     ? "Could not load count"
                     : "Classified as promotional";
+        }
+
+        if (index === 3) {
+            value = cleanupStatsLoading
+                ? "..."
+                : cleanupStats !== null
+                    ? String(cleanupStats.cleanedEmails)
+                    : "—";
+
+            detail = cleanupStatsLoading
+                ? "Loading cleanup history..."
+                : cleanupStatsError
+                    ? "Could not load count"
+                    : "Completed cleanup records";
         }
 
         return {
@@ -345,6 +428,7 @@ function App() {
                             <h3>
                                 {authUser?.name || "Your workspace"}
                             </h3>
+
                             <p>
                                 {isAuthenticated
                                     ? authUser.email
@@ -448,6 +532,22 @@ function App() {
                             }}
                         >
                             Email statistics couldn't load: {statsError}
+                        </div>
+                    )}
+
+                    {cleanupStatsError && isAuthenticated && (
+                        <div
+                            role="alert"
+                            style={{
+                                marginBottom: "18px",
+                                padding: "12px 15px",
+                                borderRadius: "10px",
+                                background: "#fff8e8",
+                                color: "#875b12",
+                                fontSize: "12px"
+                            }}
+                        >
+                            Cleanup statistics couldn't load: {cleanupStatsError}
                         </div>
                     )}
 
@@ -584,7 +684,6 @@ function App() {
                             <div className="category-list">
                                 {categories.map((category, index) => {
                                     const key = category.toLowerCase();
-
                                     const count = categoryCounts?.[key];
 
                                     return (

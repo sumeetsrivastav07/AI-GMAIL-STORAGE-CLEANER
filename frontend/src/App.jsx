@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import EmailList from "./components/EmailList.jsx";
+import ThemeToggle from "./components/ThemeToggle.jsx";
+import CategoryBreakdown from "./components/CategoryBreakdown.jsx";
 
 const BACKEND_ORIGIN = "http://localhost:5000";
 const TOKEN_KEY = "clearmail_token";
@@ -666,54 +668,11 @@ function App() {
                             </div>
                         </article>
 
-                        <article className="panel category-panel">
-                            <div className="panel-heading">
-                                <div>
-                                    <h2>Email categories</h2>
-                                    <p>
-                                        See how your emails are organized.
-                                    </p>
-                                </div>
-                            </div>
 
-                            <div className="category-list">
-                                {categories.map((category, index) => {
-                                    const key = category.toLowerCase();
-                                    const count = categoryCounts?.[key];
+                        <CategoryBreakdown
+                            categoryCounts={categoryCounts || {}}
+                        />
 
-                                    return (
-                                        <div
-                                            className="category-row"
-                                            key={category}
-                                        >
-                                            <span
-                                                className={`category-dot category-${index}`}
-                                            ></span>
-
-                                            <span className="category-name">
-                                                {category}
-                                            </span>
-
-                                            <span className="category-count">
-                                                {statsLoading
-                                                    ? "..."
-                                                    : typeof count === "number"
-                                                        ? count
-                                                        : "—"}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            <p className="category-footnote">
-                                {statsError
-                                    ? "Category counts could not be loaded."
-                                    : isAuthenticated
-                                        ? "Counts from your saved email records."
-                                        : "Sign in to view category counts."}
-                            </p>
-                        </article>
                     </section>
 
                     {/* Actual email list */}
@@ -729,6 +688,7 @@ function App() {
                     </footer>
                 </div>
             </main>
+            <ThemeToggle />
         </div>
     );
 }

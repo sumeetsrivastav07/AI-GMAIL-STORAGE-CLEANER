@@ -1,6 +1,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
+import EmailList from "./components/EmailList.jsx";
 
 const BACKEND_ORIGIN = "http://localhost:5000";
 const TOKEN_KEY = "clearmail_token";
@@ -77,7 +78,6 @@ function App() {
 
     const isAuthenticated = Boolean(authToken && authUser);
 
-    // Receive Google OAuth result from the login popup.
     useEffect(() => {
         const handleAuthMessage = (event) => {
             if (event.origin !== BACKEND_ORIGIN) {
@@ -204,7 +204,7 @@ function App() {
         };
     }, [authToken]);
 
-    // Fetch cleanup statistics from cleanup history.
+    // Fetch cleanup statistics.
     useEffect(() => {
         if (!authToken) {
             setCleanupStats(null);
@@ -361,11 +361,7 @@ function App() {
                     : "Completed cleanup records";
         }
 
-        return {
-            ...stat,
-            value,
-            detail
-        };
+        return { ...stat, value, detail };
     });
 
     return (
@@ -428,7 +424,6 @@ function App() {
                             <h3>
                                 {authUser?.name || "Your workspace"}
                             </h3>
-
                             <p>
                                 {isAuthenticated
                                     ? authUser.email
@@ -720,6 +715,9 @@ function App() {
                             </p>
                         </article>
                     </section>
+
+                    {/* Actual email list */}
+                    <EmailList token={isAuthenticated ? authToken : ""} />
 
                     <footer className="dashboard-footer">
                         <span>ClearMail · Gmail Storage Cleaner</span>

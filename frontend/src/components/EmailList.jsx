@@ -20,6 +20,9 @@ function EmailList({ token }) {
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("");
     const [selectedIds, setSelectedIds] = useState([]);
+    const [actionLoading, setActionLoading] = useState(false);
+    const [actionMessage, setActionMessage] = useState("");
+    const [actionError, setActionError] = useState("");
 
     useEffect(() => {
         if (!token) {
@@ -111,6 +114,9 @@ function EmailList({ token }) {
                 ? previousIds.filter((id) => id !== messageId)
                 : [...previousIds, messageId]
         );
+
+        setActionMessage("");
+        setActionError("");
     };
 
     const toggleAllVisible = () => {
@@ -129,10 +135,87 @@ function EmailList({ token }) {
                 ...new Set([...previousIds, ...visibleIds])
             ]);
         }
+
+        setActionMessage("");
+        setActionError("");
     };
 
     const clearSelection = () => {
         setSelectedIds([]);
+        setActionMessage("");
+        setActionError("");
+    };
+
+    const handleCleanup = async (action) => {
+        if (!token || selectedIds.length === 0 || actionLoading) {
+            return;
+        }
+
+        const actionLabel =
+            action === "archive" ? "archive" : "move to Trash";
+
+        const confirmed = window.confirm(
+            `Are you sure you want to ${actionLabel} ${selectedIds.length} selected email(s)? Protected and whitelisted emails will be skipped.`
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        setActionLoading(true);
+        setActionMessage("");
+        setActionError("");
+
+        try {
+            const response = await fetch(
+                `${BACKEND_ORIGIN}/api/cleanup/bulk`,
+                {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        messageIds: selectedIds,
+                        action,
+                        confirmed: true
+                    })
+                }
+            );
+
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                throw new Error(
+                    result.message || "Cleanup operation failed"
+                );
+            }
+
+            const processedIds = result.data?.messageIds || [];
+            const skippedIds =
+                result.data?.protectedSkippedMessageIds || [];
+
+            // Remove processed emails from the current UI list.
+            setEmails((previousEmails) =>
+                previousEmails.filter(
+                    (email) => !processedIds.includes(email.messageId)
+                )
+            );
+
+            // Keep any protected emails selected so the user can see
+            // which selection was skipped.
+            setSelectedIds(skippedIds);
+
+            setActionMessage(
+                `${result.message}. Processed: ${result.data.processedCount}; skipped: ${result.data.protectedSkippedCount}.`
+            );
+        } catch (error) {
+            setActionError(
+                error.message || "Cleanup operation failed"
+            );
+        } finally {
+            setActionLoading(false);
+        }
     };
 
     const formatDate = (dateValue) => {
@@ -154,7 +237,7 @@ function EmailList({ token }) {
             <div className="email-list-heading">
                 <div>
                     <h2>Your emails</h2>
-                    <p>Search, filter and select saved emails</p>
+                    <p>Search, filter and manage saved emails</p>
                 </div>
 
                 <span className="email-total">
@@ -208,20 +291,63 @@ function EmailList({ token }) {
                     </label>
 
                     <div className="selection-summary">
-                        <span>
-                            {selectedIds.length} selected
-                        </span>
+                        <span>{selectedIds.length} selected</span>
 
                         {selectedIds.length > 0 && (
                             <button
                                 type="button"
                                 className="clear-selection-button"
                                 onClick={clearSelection}
+                                disabled={actionLoading}
                             >
                                 Clear selection
                             </button>
                         )}
                     </div>
+                </div>
+            )}
+
+            {selectedIds.length > 0 && (
+                <div className="email-action-toolbar">
+                    <p>
+                        Manage {selectedIds.length} selected email(s)
+                    </p>
+
+                    <div className="email-action-buttons">
+                        <button
+                            type="button"
+                            className="email-action-button archive-button"
+                            onClick={() => handleCleanup("archive")}
+                            disabled={actionLoading || !token}
+                        >
+                            {actionLoading
+                                ? "Processing..."
+                                : "Archive selected"}
+                        </button>
+
+                        <button
+                            type="button"
+                            className="email-action-button trash-button"
+                            onClick={() => handleCleanup("delete")}
+                            disabled={actionLoading || !token}
+                        >
+                            {actionLoading
+                                ? "Processing..."
+                                : "Move to Trash"}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {actionMessage && (
+                <div className="cleanup-action-success" role="status">
+                    {actionMessage}
+                </div>
+            )}
+
+            {actionError && (
+                <div className="email-list-error" role="alert">
+                    {actionError}
                 </div>
             )}
 
@@ -245,9 +371,8 @@ function EmailList({ token }) {
 
             {!loading && !error && token && emails.length === 0 && (
                 <div className="email-list-message">
-                    {selectedCategory
-                        ? "No saved emails found in this category."
-                        : "No saved emails found. Fetch your Gmail messages through the backend first."}
+                    No saved emails found. Fetch your Gmail messages
+                    through the backend first.
                 </div>
             )}
 
@@ -278,6 +403,7 @@ function EmailList({ token }) {
                                     className="email-select-checkbox"
                                     type="checkbox"
                                     checked={isSelected}
+                                    disabled={actionLoading}
                                     onChange={() =>
                                         toggleEmail(email.messageId)
                                     }
@@ -313,8 +439,8 @@ function EmailList({ token }) {
 
             {selectedIds.length > 0 && (
                 <p className="selection-note">
-                    Selection is preserved when you change your search
-                    or category filter.
+                    Protected or whitelisted emails are skipped by the
+                    backend. Cleanup actions require confirmation.
                 </p>
             )}
         </section>

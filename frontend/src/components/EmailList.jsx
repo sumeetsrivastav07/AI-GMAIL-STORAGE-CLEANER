@@ -19,10 +19,12 @@ function EmailList({ token }) {
     const [error, setError] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("");
+    const [selectedIds, setSelectedIds] = useState([]);
 
     useEffect(() => {
         if (!token) {
             setEmails([]);
+            setSelectedIds([]);
             setError("");
             setLoading(false);
             return;
@@ -97,6 +99,42 @@ function EmailList({ token }) {
             .includes(normalizedSearch);
     });
 
+    const allVisibleSelected =
+        filteredEmails.length > 0 &&
+        filteredEmails.every((email) =>
+            selectedIds.includes(email.messageId)
+        );
+
+    const toggleEmail = (messageId) => {
+        setSelectedIds((previousIds) =>
+            previousIds.includes(messageId)
+                ? previousIds.filter((id) => id !== messageId)
+                : [...previousIds, messageId]
+        );
+    };
+
+    const toggleAllVisible = () => {
+        const visibleIds = filteredEmails.map(
+            (email) => email.messageId
+        );
+
+        if (allVisibleSelected) {
+            setSelectedIds((previousIds) =>
+                previousIds.filter(
+                    (id) => !visibleIds.includes(id)
+                )
+            );
+        } else {
+            setSelectedIds((previousIds) => [
+                ...new Set([...previousIds, ...visibleIds])
+            ]);
+        }
+    };
+
+    const clearSelection = () => {
+        setSelectedIds([]);
+    };
+
     const formatDate = (dateValue) => {
         if (!dateValue) {
             return "Date unavailable";
@@ -116,7 +154,7 @@ function EmailList({ token }) {
             <div className="email-list-heading">
                 <div>
                     <h2>Your emails</h2>
-                    <p>Search and filter your saved emails</p>
+                    <p>Search, filter and select saved emails</p>
                 </div>
 
                 <span className="email-total">
@@ -157,6 +195,36 @@ function EmailList({ token }) {
                 </select>
             </div>
 
+            {token && !loading && !error && emails.length > 0 && (
+                <div className="selection-toolbar">
+                    <label className="select-all-label">
+                        <input
+                            type="checkbox"
+                            checked={allVisibleSelected}
+                            onChange={toggleAllVisible}
+                            disabled={filteredEmails.length === 0}
+                        />
+                        <span>Select all visible</span>
+                    </label>
+
+                    <div className="selection-summary">
+                        <span>
+                            {selectedIds.length} selected
+                        </span>
+
+                        {selectedIds.length > 0 && (
+                            <button
+                                type="button"
+                                className="clear-selection-button"
+                                onClick={clearSelection}
+                            >
+                                Clear selection
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {!token && (
                 <div className="email-list-message">
                     Connect Gmail to view your emails.
@@ -194,33 +262,60 @@ function EmailList({ token }) {
 
             {!loading && !error && filteredEmails.length > 0 && (
                 <div className="email-list">
-                    {filteredEmails.map((email) => (
-                        <article
-                            className="email-item"
-                            key={email.messageId}
-                        >
-                            <div className="email-item-main">
-                                <h3>
-                                    {email.sender || "Unknown sender"}
-                                </h3>
+                    {filteredEmails.map((email) => {
+                        const isSelected = selectedIds.includes(
+                            email.messageId
+                        );
 
-                                <p className="email-subject">
-                                    {email.subject || "(No subject)"}
-                                </p>
+                        return (
+                            <article
+                                className={`email-item ${
+                                    isSelected ? "selected" : ""
+                                }`}
+                                key={email.messageId}
+                            >
+                                <input
+                                    className="email-select-checkbox"
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() =>
+                                        toggleEmail(email.messageId)
+                                    }
+                                    aria-label={`Select email: ${
+                                        email.subject || "No subject"
+                                    }`}
+                                />
 
-                                <div className="email-item-meta">
-                                    <span className="email-category">
-                                        {email.category || "other"}
-                                    </span>
+                                <div className="email-item-main">
+                                    <h3>
+                                        {email.sender || "Unknown sender"}
+                                    </h3>
 
-                                    <span>
-                                        {formatDate(email.date)}
-                                    </span>
+                                    <p className="email-subject">
+                                        {email.subject || "(No subject)"}
+                                    </p>
+
+                                    <div className="email-item-meta">
+                                        <span className="email-category">
+                                            {email.category || "other"}
+                                        </span>
+
+                                        <span>
+                                            {formatDate(email.date)}
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
-                        </article>
-                    ))}
+                            </article>
+                        );
+                    })}
                 </div>
+            )}
+
+            {selectedIds.length > 0 && (
+                <p className="selection-note">
+                    Selection is preserved when you change your search
+                    or category filter.
+                </p>
             )}
         </section>
     );

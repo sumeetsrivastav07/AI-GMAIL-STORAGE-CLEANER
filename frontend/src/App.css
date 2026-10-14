@@ -677,3 +677,169 @@
         height: 9px;
     }
 }
+
+/* ========================================
+   THEME-AWARE DASHBOARD
+======================================== */
+
+.app-shell {
+    min-height: 100vh;
+    background: var(--page-bg);
+    color: var(--text-primary);
+    transition:
+        background-color 0.3s ease,
+        color 0.3s ease;
+}
+
+/* Dashboard cards and panels */
+.app-shell [class*="card"],
+.app-shell [class*="panel"],
+.app-shell [class*="stat"],
+.app-shell [class*="activity"],
+.app-shell [class*="email-item"],
+.app-shell [class*="email-row"] {
+    background-color: var(--surface);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+    transition:
+        background-color 0.3s ease,
+        color 0.3s ease,
+        border-color 0.3s ease,
+        box-shadow 0.25s ease,
+        transform 0.25s ease;
+}
+
+/* Consistent heading colors */
+.app-shell h1,
+.app-shell h2,
+.app-shell h3,
+.app-shell h4 {
+    color: var(--text-primary);
+    transition: color 0.3s ease;
+}
+
+/* Search fields and other inputs */
+.app-shell input,
+.app-shell select,
+.app-shell textarea {
+    background-color: var(--surface);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+    transition:
+        background-color 0.3s ease,
+        color 0.3s ease,
+        border-color 0.3s ease;
+}
+
+/* Placeholder text */
+.app-shell input::placeholder,
+.app-shell textarea::placeholder {
+    color: var(--text-secondary);
+}
+
+/* Dashboard cards respond to hover */
+.app-shell [class*="card"]:hover {
+    box-shadow: var(--shadow-soft);
+    transform: translateY(-3px);
+}
+
+/* Improve the floating theme toggle in dark mode */
+:root[data-theme="dark"] .theme-toggle {
+    background: rgba(19, 28, 46, 0.96);
+    color: #edf2ff;
+    border-color: var(--border-color);
+}
+
+/* Keyboard focus remains visible */
+.app-shell input:focus-visible,
+.app-shell select:focus-visible,
+.app-shell textarea:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+    .app-shell,
+    .app-shell *,
+    .theme-toggle {
+        transition: none !important;
+        animation: none !important;
+    }
+}
+
+
+/* ========================================
+   CLEMAIL VISUAL POLISH
+   1. Animated ambient background
+   2. Smooth dashboard entrance
+======================================== */
+
+/* Subtle moving blue glow */
+.app-shell {
+    background-image:
+        radial-gradient(
+            circle at 12% 12%,
+            rgba(83, 109, 254, 0.09),
+            transparent 32%
+        ),
+        radial-gradient(
+            circle at 88% 78%,
+            rgba(69, 192, 190, 0.07),
+            transparent 30%
+        );
+
+    background-size: 140% 140%;
+    animation: ambientBackground 18s ease-in-out infinite alternate;
+}
+
+/* Dark mode gets a more subtle glow */
+:root[data-theme="dark"] .app-shell {
+    background-image:
+        radial-gradient(
+            circle at 12% 12%,
+            rgba(83, 109, 254, 0.13),
+            transparent 32%
+        ),
+        radial-gradient(
+            circle at 88% 78%,
+            rgba(69, 192, 190, 0.06),
+            transparent 30%
+        );
+}
+
+/* Gentle moving background */
+@keyframes ambientBackground {
+    from {
+        background-position: 0% 0%;
+    }
+
+    to {
+        background-position: 100% 100%;
+    }
+}
+
+/* Dashboard content enters smoothly */
+.app-shell > main {
+    animation: dashboardEntrance 0.65s ease-out both;
+}
+
+@keyframes dashboardEntrance {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    .app-shell,
+    .app-shell > main {
+        animation: none !important;
+    }
+}

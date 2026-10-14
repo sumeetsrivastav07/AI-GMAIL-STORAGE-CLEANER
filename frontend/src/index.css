@@ -22,3 +22,61 @@ body {
 #root {
     min-height: 100vh;
 }
+/* ================================
+   CLEMAIL THEME SYSTEM
+================================ */
+
+:root {
+    color-scheme: light;
+
+    --page-bg: #f4f7fc;
+    --surface: #ffffff;
+    --surface-soft: #f8faff;
+
+    --text-primary: #172033;
+    --text-secondary: #64748b;
+
+    --border-color: #e2e8f0;
+    --accent-color: #536dfe;
+
+    --shadow-soft: 0 10px 30px rgba(28, 43, 75, 0.08);
+}
+
+/* Dark mode colors */
+:root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --page-bg: #0b1120;
+    --surface: #131c2e;
+    --surface-soft: #19253a;
+
+    --text-primary: #edf2ff;
+    --text-secondary: #a0aec4;
+
+    --border-color: #2b3951;
+    --accent-color: #91a7ff;
+
+    --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+/* Smooth global color transitions */
+html,
+body {
+    min-height: 100%;
+    transition:
+        background-color 0.3s ease,
+        color 0.3s ease;
+}
+
+body {
+    background-color: var(--page-bg);
+    color: var(--text-primary);
+}
+
+/* Respect accessibility preferences */
+@media (prefers-reduced-motion: reduce) {
+    html,
+    body {
+        transition: none;
+    }
+}

@@ -132,3 +132,38 @@
     border-color: #3865d2;
     box-shadow: 0 0 0 3px #3865d21a;
 }
+
+.email-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 190px;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.email-controls .email-search-input {
+    margin-bottom: 0;
+}
+
+.email-category-select {
+    width: 100%;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #344056;
+    font: inherit;
+    font-size: 12px;
+    outline: none;
+}
+
+.email-category-select:focus {
+    border-color: #3865d2;
+    box-shadow: 0 0 0 3px #3865d21a;
+}
+
+@media (max-width: 600px) {
+    .email-controls {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

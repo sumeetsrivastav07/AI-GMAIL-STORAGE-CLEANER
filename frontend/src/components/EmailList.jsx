@@ -4,11 +4,21 @@ import "./EmailList.css";
 
 const BACKEND_ORIGIN = "http://localhost:5000";
 
+const categories = [
+    { label: "All categories", value: "" },
+    { label: "Promotional", value: "promotional" },
+    { label: "Newsletter", value: "newsletter" },
+    { label: "Important", value: "important" },
+    { label: "Social", value: "social" },
+    { label: "Other", value: "other" }
+];
+
 function EmailList({ token }) {
     const [emails, setEmails] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState("");
 
     useEffect(() => {
         if (!token) {
@@ -25,8 +35,12 @@ function EmailList({ token }) {
             setError("");
 
             try {
+                const query = selectedCategory
+                    ? `?category=${encodeURIComponent(selectedCategory)}`
+                    : "";
+
                 const response = await fetch(
-                    `${BACKEND_ORIGIN}/api/gmail/emails`,
+                    `${BACKEND_ORIGIN}/api/gmail/emails${query}`,
                     {
                         headers: {
                             Authorization: `Bearer ${token}`
@@ -70,7 +84,7 @@ function EmailList({ token }) {
         return () => {
             cancelled = true;
         };
-    }, [token]);
+    }, [token, selectedCategory]);
 
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
@@ -102,26 +116,46 @@ function EmailList({ token }) {
             <div className="email-list-heading">
                 <div>
                     <h2>Your emails</h2>
-                    <p>Search emails by sender or subject</p>
+                    <p>Search and filter your saved emails</p>
                 </div>
 
                 <span className="email-total">
                     {loading
                         ? "Loading..."
-                        : normalizedSearch
-                            ? `${filteredEmails.length} of ${emails.length}`
-                            : `${emails.length} emails`}
+                        : `${filteredEmails.length} emails`}
                 </span>
             </div>
 
-            <input
-                className="email-search-input"
-                type="search"
-                placeholder="Search sender or subject..."
-                aria-label="Search emails by sender or subject"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-            />
+            <div className="email-controls">
+                <input
+                    className="email-search-input"
+                    type="search"
+                    placeholder="Search sender or subject..."
+                    aria-label="Search emails by sender or subject"
+                    value={searchTerm}
+                    onChange={(event) =>
+                        setSearchTerm(event.target.value)
+                    }
+                />
+
+                <select
+                    className="email-category-select"
+                    aria-label="Filter emails by category"
+                    value={selectedCategory}
+                    onChange={(event) =>
+                        setSelectedCategory(event.target.value)
+                    }
+                >
+                    {categories.map((category) => (
+                        <option
+                            key={category.value || "all"}
+                            value={category.value}
+                        >
+                            {category.label}
+                        </option>
+                    ))}
+                </select>
+            </div>
 
             {!token && (
                 <div className="email-list-message">
@@ -143,8 +177,9 @@ function EmailList({ token }) {
 
             {!loading && !error && token && emails.length === 0 && (
                 <div className="email-list-message">
-                    No saved emails found. Fetch your Gmail messages
-                    through the backend first.
+                    {selectedCategory
+                        ? "No saved emails found in this category."
+                        : "No saved emails found. Fetch your Gmail messages through the backend first."}
                 </div>
             )}
 

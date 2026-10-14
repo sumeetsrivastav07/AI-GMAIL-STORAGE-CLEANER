@@ -20,10 +20,16 @@ function EmailList({ token }) {
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("");
     const [selectedIds, setSelectedIds] = useState([]);
+
+    const [protectedIds, setProtectedIds] = useState([]);
+    const [protectionLoading, setProtectionLoading] = useState(false);
+    const [protectionError, setProtectionError] = useState("");
+
     const [actionLoading, setActionLoading] = useState(false);
     const [actionMessage, setActionMessage] = useState("");
     const [actionError, setActionError] = useState("");
 
+    // Fetch saved emails, filtered by category when selected.
     useEffect(() => {
         if (!token) {
             setEmails([]);
@@ -62,9 +68,7 @@ function EmailList({ token }) {
                 }
 
                 if (!Array.isArray(result.data)) {
-                    throw new Error(
-                        "Invalid email data received from server"
-                    );
+                    throw new Error("Invalid email data received");
                 }
 
                 if (!cancelled) {
@@ -90,6 +94,71 @@ function EmailList({ token }) {
             cancelled = true;
         };
     }, [token, selectedCategory]);
+
+    // Fetch the IDs of emails protected by this user.
+    useEffect(() => {
+        if (!token) {
+            setProtectedIds([]);
+            setProtectionError("");
+            setProtectionLoading(false);
+            return;
+        }
+
+        let cancelled = false;
+
+        const fetchProtectedEmails = async () => {
+            setProtectionLoading(true);
+            setProtectionError("");
+
+            try {
+                const response = await fetch(
+                    `${BACKEND_ORIGIN}/api/protected-emails`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        }
+                    }
+                );
+
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    throw new Error(
+                        result.message || "Failed to fetch protected emails"
+                    );
+                }
+
+                if (!Array.isArray(result.data)) {
+                    throw new Error(
+                        "Invalid protected-email data received"
+                    );
+                }
+
+                if (!cancelled) {
+                    setProtectedIds(
+                        result.data.map((email) => email.messageId)
+                    );
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    setProtectedIds([]);
+                    setProtectionError(
+                        error.message || "Could not check protected emails"
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    setProtectionLoading(false);
+                }
+            }
+        };
+
+        fetchProtectedEmails();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [token]);
 
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
@@ -195,15 +264,12 @@ function EmailList({ token }) {
             const skippedIds =
                 result.data?.protectedSkippedMessageIds || [];
 
-            // Remove processed emails from the current UI list.
             setEmails((previousEmails) =>
                 previousEmails.filter(
                     (email) => !processedIds.includes(email.messageId)
                 )
             );
 
-            // Keep any protected emails selected so the user can see
-            // which selection was skipped.
             setSelectedIds(skippedIds);
 
             setActionMessage(
@@ -309,9 +375,7 @@ function EmailList({ token }) {
 
             {selectedIds.length > 0 && (
                 <div className="email-action-toolbar">
-                    <p>
-                        Manage {selectedIds.length} selected email(s)
-                    </p>
+                    <p>Manage {selectedIds.length} selected email(s)</p>
 
                     <div className="email-action-buttons">
                         <button
@@ -320,9 +384,7 @@ function EmailList({ token }) {
                             onClick={() => handleCleanup("archive")}
                             disabled={actionLoading || !token}
                         >
-                            {actionLoading
-                                ? "Processing..."
-                                : "Archive selected"}
+                            {actionLoading ? "Processing..." : "Archive selected"}
                         </button>
 
                         <button
@@ -331,9 +393,7 @@ function EmailList({ token }) {
                             onClick={() => handleCleanup("delete")}
                             disabled={actionLoading || !token}
                         >
-                            {actionLoading
-                                ? "Processing..."
-                                : "Move to Trash"}
+                            {actionLoading ? "Processing..." : "Move to Trash"}
                         </button>
                     </div>
                 </div>
@@ -349,6 +409,19 @@ function EmailList({ token }) {
                 <div className="email-list-error" role="alert">
                     {actionError}
                 </div>
+            )}
+
+            {protectionError && token && (
+                <div className="email-list-error" role="alert">
+                    Protected-email indicators could not be loaded.
+                    Cleanup safeguards are still enforced by the backend.
+                </div>
+            )}
+
+            {!protectionError && protectionLoading && token && (
+                <p className="protection-loading">
+                    Checking protected emails...
+                </p>
             )}
 
             {!token && (
@@ -371,8 +444,9 @@ function EmailList({ token }) {
 
             {!loading && !error && token && emails.length === 0 && (
                 <div className="email-list-message">
-                    No saved emails found. Fetch your Gmail messages
-                    through the backend first.
+                    {selectedCategory
+                        ? "No saved emails found in this category."
+                        : "No saved emails found. Fetch your Gmail messages through the backend first."}
                 </div>
             )}
 
@@ -389,6 +463,10 @@ function EmailList({ token }) {
                 <div className="email-list">
                     {filteredEmails.map((email) => {
                         const isSelected = selectedIds.includes(
+                            email.messageId
+                        );
+
+                        const isProtected = protectedIds.includes(
                             email.messageId
                         );
 
@@ -413,9 +491,18 @@ function EmailList({ token }) {
                                 />
 
                                 <div className="email-item-main">
-                                    <h3>
-                                        {email.sender || "Unknown sender"}
-                                    </h3>
+                                    <div className="email-sender-row">
+                                        <h3>
+                                            {email.sender || "Unknown sender"}
+                                        </h3>
+
+                                        {isProtected && (
+                                            <span className="protected-badge">
+                                                <span aria-hidden="true">✓</span>
+                                                Protected
+                                            </span>
+                                        )}
+                                    </div>
 
                                     <p className="email-subject">
                                         {email.subject || "(No subject)"}
@@ -426,9 +513,7 @@ function EmailList({ token }) {
                                             {email.category || "other"}
                                         </span>
 
-                                        <span>
-                                            {formatDate(email.date)}
-                                        </span>
+                                        <span>{formatDate(email.date)}</span>
                                     </div>
                                 </div>
                             </article>

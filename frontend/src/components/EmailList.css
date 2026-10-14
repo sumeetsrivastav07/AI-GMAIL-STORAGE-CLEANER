@@ -324,3 +324,29 @@
         grid-template-columns: 1fr;
     }
 }
+
+.email-sender-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 9px;
+}
+
+.protected-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 8px;
+    border-radius: 6px;
+    background: #e7f8ef;
+    color: #18744f;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.protected-loading {
+    margin: 0 0 12px;
+    color: #7b8597;
+    font-size: 11px;
+}

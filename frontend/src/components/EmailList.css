@@ -108,3 +108,27 @@
         align-items: flex-start;
     }
 }
+
+
+.email-search-input {
+    width: 100%;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #202c40;
+    font: inherit;
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.email-search-input::placeholder {
+    color: #9aa3b1;
+}
+
+.email-search-input:focus {
+    border-color: #3865d2;
+    box-shadow: 0 0 0 3px #3865d21a;
+}

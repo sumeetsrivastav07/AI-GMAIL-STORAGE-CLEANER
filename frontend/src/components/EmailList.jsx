@@ -8,6 +8,7 @@ function EmailList({ token }) {
     const [emails, setEmails] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [searchTerm, setSearchTerm] = useState("");
 
     useEffect(() => {
         if (!token) {
@@ -71,6 +72,17 @@ function EmailList({ token }) {
         };
     }, [token]);
 
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    const filteredEmails = emails.filter((email) => {
+        const sender = email.sender || "";
+        const subject = email.subject || "";
+
+        return `${sender} ${subject}`
+            .toLowerCase()
+            .includes(normalizedSearch);
+    });
+
     const formatDate = (dateValue) => {
         if (!dateValue) {
             return "Date unavailable";
@@ -90,13 +102,26 @@ function EmailList({ token }) {
             <div className="email-list-heading">
                 <div>
                     <h2>Your emails</h2>
-                    <p>Emails saved in your workspace</p>
+                    <p>Search emails by sender or subject</p>
                 </div>
 
                 <span className="email-total">
-                    {loading ? "Loading..." : `${emails.length} emails`}
+                    {loading
+                        ? "Loading..."
+                        : normalizedSearch
+                            ? `${filteredEmails.length} of ${emails.length}`
+                            : `${emails.length} emails`}
                 </span>
             </div>
+
+            <input
+                className="email-search-input"
+                type="search"
+                placeholder="Search sender or subject..."
+                aria-label="Search emails by sender or subject"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+            />
 
             {!token && (
                 <div className="email-list-message">
@@ -123,9 +148,18 @@ function EmailList({ token }) {
                 </div>
             )}
 
-            {!loading && !error && emails.length > 0 && (
+            {!loading &&
+                !error &&
+                emails.length > 0 &&
+                filteredEmails.length === 0 && (
+                    <div className="email-list-message">
+                        No emails match your search.
+                    </div>
+                )}
+
+            {!loading && !error && filteredEmails.length > 0 && (
                 <div className="email-list">
-                    {emails.map((email) => (
+                    {filteredEmails.map((email) => (
                         <article
                             className="email-item"
                             key={email.messageId}

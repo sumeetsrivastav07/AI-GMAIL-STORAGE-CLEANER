@@ -1,0 +1,66 @@
+
+.activity-panel {
+    min-width: 0;
+}
+
+.activity-panel .panel-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+.activity-panel .panel-heading h2 {
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.activity-panel .panel-heading p {
+    margin: 6px 0 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.activity-panel .panel-tag {
+    flex-shrink: 0;
+    padding: 6px 11px;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.activity-panel .empty-state {
+    padding: 28px 16px;
+    text-align: center;
+    border: 1px dashed var(--border-color);
+    border-radius: 14px;
+    background: var(--surface-soft);
+}
+
+.activity-panel .empty-icon {
+    margin-bottom: 12px;
+    color: var(--accent-color);
+    font-size: 2rem;
+}
+
+.activity-panel .empty-state h3 {
+    margin: 0 0 8px;
+    color: var(--text-primary);
+}
+
+.activity-panel .empty-state p,
+.activity-panel > p {
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.activity-panel [role="alert"] {
+    padding: 12px 14px;
+    border: 1px solid #dc6262;
+    border-radius: 10px;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+}

@@ -4,7 +4,7 @@ import "./App.css";
 import EmailList from "./components/EmailList.jsx";
 import ThemeToggle from "./components/ThemeToggle.jsx";
 import CategoryBreakdown from "./components/CategoryBreakdown.jsx";
-
+import CleanupActivity from "./components/CleanupActivity.jsx";
 const BACKEND_ORIGIN = "http://localhost:5000";
 const TOKEN_KEY = "clearmail_token";
 const USER_KEY = "clearmail_user";
@@ -644,35 +644,13 @@ function App() {
                     </section>
 
                     <section className="dashboard-panels">
-                        <article className="panel activity-panel">
-                            <div className="panel-heading">
-                                <div>
-                                    <h2>Cleanup activity</h2>
-                                    <p>
-                                        Review your recent cleanup actions.
-                                    </p>
-                                </div>
-
-                                <span className="panel-tag">History</span>
-                            </div>
-
-                            <div className="empty-state">
-                                <div className="empty-icon">↻</div>
-
-                                <h3>No activity displayed yet</h3>
-
-                                <p>
-                                    Your cleanup history will appear here
-                                    when the dashboard connects to the API.
-                                </p>
-                            </div>
-                        </article>
-
+                        <CleanupActivity
+                            token={isAuthenticated ? authToken : ""}
+                        />
 
                         <CategoryBreakdown
                             categoryCounts={categoryCounts || {}}
                         />
-
                     </section>
 
                     {/* Actual email list */}

@@ -76,6 +76,10 @@ function App() {
     const [cleanupStatsLoading, setCleanupStatsLoading] = useState(false);
     const [cleanupStatsError, setCleanupStatsError] = useState("");
 
+    const [protectedEmails, setProtectedEmails] = useState(null);
+    const [protectedEmailsLoading, setProtectedEmailsLoading] = useState(false);
+    const [protectedEmailsError, setProtectedEmailsError] = useState("");
+
     const popupRef = useRef(null);
 
     const isAuthenticated = Boolean(authToken && authUser);
@@ -273,6 +277,69 @@ function App() {
         };
     }, [authToken]);
 
+    // Fetch protected emails for the dashboard statistic.
+    useEffect(() => {
+        if (!authToken) {
+            setProtectedEmails(null);
+            setProtectedEmailsLoading(false);
+            setProtectedEmailsError("");
+            return;
+        }
+
+        let cancelled = false;
+
+        const fetchProtectedEmails = async () => {
+            setProtectedEmailsLoading(true);
+            setProtectedEmailsError("");
+
+            try {
+                const response = await fetch(
+                    `${BACKEND_ORIGIN}/api/protected-emails`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${authToken}`,
+                        },
+                    }
+                );
+
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    throw new Error(
+                        result.message || "Could not fetch protected emails"
+                    );
+                }
+
+                if (!Array.isArray(result.data)) {
+                    throw new Error(
+                        "Protected emails response has an invalid format"
+                    );
+                }
+
+                if (!cancelled) {
+                    setProtectedEmails(result.data);
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    setProtectedEmails(null);
+                    setProtectedEmailsError(
+                        error.message || "Could not load protected emails"
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    setProtectedEmailsLoading(false);
+                }
+            }
+        };
+
+        fetchProtectedEmails();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [authToken]);
+
     const handleConnectGmail = () => {
         setAuthError("");
         setIsConnecting(true);
@@ -303,6 +370,9 @@ function App() {
         setEmailStats(null);
         setCategoryCounts(null);
         setCleanupStats(null);
+        setProtectedEmails(null);
+        setProtectedEmailsLoading(false);
+        setProtectedEmailsError("");
         setStatsError("");
         setCleanupStatsError("");
         setAuthError("");
@@ -347,6 +417,22 @@ function App() {
                 : statsError
                     ? "Could not load count"
                     : "Classified as promotional";
+        }
+
+        if (index === 2) {
+            value = protectedEmailsLoading
+                ? "..."
+                : protectedEmails !== null
+                    ? String(protectedEmails.length)
+                    : "—";
+
+            detail = protectedEmailsLoading
+                ? "Loading protected emails..."
+                : protectedEmailsError
+                    ? "Could not load count"
+                    : isAuthenticated
+                        ? "Emails on your protection list"
+                        : "Sign in to view statistics";
         }
 
         if (index === 3) {
@@ -545,6 +631,22 @@ function App() {
                             }}
                         >
                             Cleanup statistics couldn't load: {cleanupStatsError}
+                        </div>
+                    )}
+
+                    {protectedEmailsError && isAuthenticated && (
+                        <div
+                            role="alert"
+                            style={{
+                                marginBottom: "18px",
+                                padding: "12px 15px",
+                                borderRadius: "10px",
+                                background: "#fff8e8",
+                                color: "#875b12",
+                                fontSize: "12px"
+                            }}
+                        >
+                            Protected emails couldn't load: {protectedEmailsError}
                         </div>
                     )}
 

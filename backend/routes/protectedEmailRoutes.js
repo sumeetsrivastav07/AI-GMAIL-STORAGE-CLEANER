@@ -1,10 +1,12 @@
+
 import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
 import ProtectedEmail from "../models/ProtectedEmail.js";
 import Email from "../models/Email.js";
+
 const router = express.Router();
 
-
+// GET all protected emails for the logged-in user
 router.get("/", authMiddleware, async (req, res) => {
     try {
         const protectedEmails = await ProtectedEmail.find({
@@ -38,7 +40,7 @@ router.get("/", authMiddleware, async (req, res) => {
             };
         });
 
-        res.json({
+        return res.json({
             success: true,
             message: "Protected emails fetched successfully",
             data
@@ -49,27 +51,44 @@ router.get("/", authMiddleware, async (req, res) => {
             error.message
         );
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Failed to fetch protected emails"
         });
     }
 });
 
+// Protect an email
 router.post("/", authMiddleware, async (req, res) => {
     try {
         const { messageId } = req.body;
 
-        if (!messageId) {
+        if (
+            typeof messageId !== "string" ||
+            messageId.trim().length === 0
+        ) {
             return res.status(400).json({
                 success: false,
-                message: "Message ID is required"
+                message: "A valid message ID is required"
+            });
+        }
+
+
+        const email = await Email.findOne({
+            userId: req.userId,
+            messageId: messageId.trim()
+        });
+
+        if (!email) {
+            return res.status(404).json({
+                success: false,
+                message: "Email not found for this user"
             });
         }
 
         const existingEmail = await ProtectedEmail.findOne({
             userId: req.userId,
-            messageId
+            messageId: messageId.trim()
         });
 
         if (existingEmail) {
@@ -81,10 +100,9 @@ router.post("/", authMiddleware, async (req, res) => {
 
         const protectedEmail = await ProtectedEmail.create({
             userId: req.userId,
-            messageId
+            messageId: messageId.trim()
         });
-
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
             message: "Email protected successfully",
             data: protectedEmail
@@ -95,7 +113,7 @@ router.post("/", authMiddleware, async (req, res) => {
             error.message
         );
 
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Failed to protect email"
         });

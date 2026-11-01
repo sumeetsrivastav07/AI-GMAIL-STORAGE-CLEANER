@@ -1,4 +1,3 @@
-
 import express from "express";
 import authMiddleware from "../middleware/authMiddleware.js";
 import Email from "../models/Email.js";
@@ -42,7 +41,10 @@ router.post("/selection", authMiddleware, async (req, res) => {
             }
         });
     } catch (error) {
-        console.error("Email selection failed:", error.message);
+        console.error(
+            "Email selection failed:",
+            error.message
+        );
 
         res.status(500).json({
             success: false,
@@ -51,14 +53,17 @@ router.post("/selection", authMiddleware, async (req, res) => {
     }
 });
 
+
+
+
 router.post("/archive", authMiddleware, async (req, res) => {
     try {
         const { messageId, confirmed } = req.body;
 
-        if (typeof messageId !== "string" || messageId.trim().length === 0) {
+        if (!messageId) {
             return res.status(400).json({
                 success: false,
-                message: "A valid message ID is required"
+                message: "Message ID is required"
             });
         }
 
@@ -90,6 +95,7 @@ router.post("/archive", authMiddleware, async (req, res) => {
             });
         }
 
+        // Check protected email and whitelisted sender
         const evaluation = await evaluateEmailRule({
             userId: req.userId,
             messageId,
@@ -103,7 +109,10 @@ router.post("/archive", authMiddleware, async (req, res) => {
             });
         }
 
+        // Save the original labels for future undo
         const previousLabels = [...(email.labels || [])];
+
+        // Archive the email in Gmail
         const gmail = getGmailClient(user.googleRefreshToken);
 
         await gmail.users.messages.modify({
@@ -114,12 +123,14 @@ router.post("/archive", authMiddleware, async (req, res) => {
             }
         });
 
+        // Synchronize MongoDB labels
         email.labels = previousLabels.filter(
             (label) => label !== "INBOX"
         );
 
         await email.save();
 
+        // Record the completed cleanup action
         const historyEntry = await CleanupHistory.create({
             userId: req.userId,
             messageId,
@@ -146,14 +157,16 @@ router.post("/archive", authMiddleware, async (req, res) => {
     }
 });
 
+
+
 router.post("/delete", authMiddleware, async (req, res) => {
     try {
         const { messageId, confirmed } = req.body;
 
-        if (typeof messageId !== "string" || messageId.trim().length === 0) {
+        if (!messageId) {
             return res.status(400).json({
                 success: false,
-                message: "A valid message ID is required"
+                message: "Message ID is required"
             });
         }
 
@@ -185,6 +198,7 @@ router.post("/delete", authMiddleware, async (req, res) => {
             });
         }
 
+        // Block protected emails and whitelisted senders
         const evaluation = await evaluateEmailRule({
             userId: req.userId,
             messageId,
@@ -198,14 +212,18 @@ router.post("/delete", authMiddleware, async (req, res) => {
             });
         }
 
+        // Save the original labels for future undo
         const previousLabels = [...(email.labels || [])];
+
         const gmail = getGmailClient(user.googleRefreshToken);
 
+        // Move the email to Gmail Trash
         await gmail.users.messages.trash({
             userId: "me",
             id: messageId
         });
 
+        // Update the local email record
         email.labels = previousLabels.filter(
             (label) => label !== "INBOX"
         );
@@ -216,6 +234,7 @@ router.post("/delete", authMiddleware, async (req, res) => {
 
         await email.save();
 
+        // Record the completed action
         const historyEntry = await CleanupHistory.create({
             userId: req.userId,
             messageId,
@@ -242,6 +261,7 @@ router.post("/delete", authMiddleware, async (req, res) => {
     }
 });
 
+
 router.post("/bulk", authMiddleware, async (req, res) => {
     try {
         const { messageIds, action, confirmed } = req.body;
@@ -250,17 +270,6 @@ router.post("/bulk", authMiddleware, async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: "At least one message ID is required"
-            });
-        }
-
-        if (
-            !messageIds.every(
-                (id) => typeof id === "string" && id.trim().length > 0
-            )
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: "Every message ID must be a non-empty string"
             });
         }
 
@@ -301,6 +310,7 @@ router.post("/bulk", authMiddleware, async (req, res) => {
             });
         }
 
+        // Check every email's protection status
         const evaluations = await Promise.all(
             emails.map(async (email) => {
                 const evaluation = await evaluateEmailRule({
@@ -340,6 +350,7 @@ router.post("/bulk", authMiddleware, async (req, res) => {
             (email) => email.messageId
         );
 
+        // Preserve the original labels for history and future undo
         const historyRecords = eligibleEmails.map((email) => ({
             userId: req.userId,
             messageId: email.messageId,
@@ -407,6 +418,7 @@ router.post("/bulk", authMiddleware, async (req, res) => {
             );
         }
 
+        // Save one history record for each processed email
         const createdHistory = await CleanupHistory.insertMany(
             historyRecords
         );
@@ -468,6 +480,7 @@ router.get("/history", authMiddleware, async (req, res) => {
     }
 });
 
+
 router.post("/undo/:historyId", authMiddleware, async (req, res) => {
     try {
         const { historyId } = req.params;
@@ -479,6 +492,7 @@ router.post("/undo/:historyId", authMiddleware, async (req, res) => {
             });
         }
 
+        // Find this history record for the authenticated user
         const history = await CleanupHistory.findOne({
             _id: historyId,
             userId: req.userId
@@ -520,8 +534,10 @@ router.post("/undo/:historyId", authMiddleware, async (req, res) => {
         }
 
         const gmail = getGmailClient(user.googleRefreshToken);
+
         const previousLabels = history.previousLabels || [];
 
+        // Restore a deleted email from Gmail Trash
         if (history.action === "delete") {
             await gmail.users.messages.untrash({
                 userId: "me",
@@ -529,6 +545,7 @@ router.post("/undo/:historyId", authMiddleware, async (req, res) => {
             });
         }
 
+        // Restore Inbox only if the email originally had that label
         if (previousLabels.includes("INBOX")) {
             await gmail.users.messages.modify({
                 userId: "me",
@@ -539,9 +556,11 @@ router.post("/undo/:historyId", authMiddleware, async (req, res) => {
             });
         }
 
+        // Restore the labels saved before cleanup
         email.labels = [...previousLabels];
         await email.save();
 
+        // Mark the history entry as undone
         history.status = "undone";
         history.undoneAt = new Date();
         await history.save();
@@ -620,5 +639,6 @@ router.get("/stats", authMiddleware, async (req, res) => {
         });
     }
 });
+
 
 export default router;

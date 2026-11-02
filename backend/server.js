@@ -12,10 +12,12 @@ import protectedEmailRoutes from "./routes/protectedEmailRoutes.js";
 import cleanupRoutes from "./routes/cleanupRoutes.js";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
+import helmet from "helmet";
+
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
 const app = express();
-
+app.use(helmet());
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     limit: 100, // Maximum 100 requests per IP

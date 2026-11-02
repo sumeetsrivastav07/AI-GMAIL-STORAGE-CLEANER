@@ -11,11 +11,23 @@ import ruleRoutes from "./routes/ruleRoutes.js";
 import protectedEmailRoutes from "./routes/protectedEmailRoutes.js";
 import cleanupRoutes from "./routes/cleanupRoutes.js";
 import cors from "cors";
-
+import rateLimit from "express-rate-limit";
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
 const app = express();
 
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 100, // Maximum 100 requests per IP
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: {
+        success: false,
+        message: "Too many requests. Please try again after 15 minutes."
+    }
+});
+
+app.use("/api", apiLimiter);
 app.use(cors({
     origin: "http://localhost:5173"
 }));

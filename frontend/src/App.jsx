@@ -5,7 +5,7 @@ import EmailList from "./components/EmailList.jsx";
 import ThemeToggle from "./components/ThemeToggle.jsx";
 import CategoryBreakdown from "./components/CategoryBreakdown.jsx";
 import CleanupActivity from "./components/CleanupActivity.jsx";
-const BACKEND_ORIGIN = "http://localhost:5000";
+const BACKEND_ORIGIN = "";
 const TOKEN_KEY = "clearmail_token";
 const USER_KEY = "clearmail_user";
 

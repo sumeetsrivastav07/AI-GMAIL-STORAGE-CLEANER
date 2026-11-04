@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import "./EmailList.css";
 
-const BACKEND_ORIGIN = "http://localhost:5000";
+const BACKEND_ORIGIN = "";
 
 const categories = [
     { label: "All categories", value: "" },

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import "./CleanupActivity.css";
-
-const BACKEND_ORIGIN = "http://localhost:5000";
+const BACKEND_ORIGIN = "";
 
 function formatDate(value) {
     if (!value) return "Date unavailable";

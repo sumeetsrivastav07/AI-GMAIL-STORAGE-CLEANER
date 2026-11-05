@@ -13,11 +13,31 @@ import cleanupRoutes from "./routes/cleanupRoutes.js";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
-
+import { randomBytes } from "crypto";
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
 const app = express();
-app.use(helmet());
+
+app.set("trust proxy", 1);
+app.use((req, res, next) => {
+    res.locals.cspNonce = randomBytes(16).toString("base64");
+    next();
+});
+app.use(
+    helmet({
+        crossOriginOpenerPolicy: {
+            policy: "same-origin-allow-popups"
+        },
+        contentSecurityPolicy: {
+            directives: {
+                scriptSrc: [
+                    "'self'",
+                    (req, res) => `'nonce-${res.locals.cspNonce}'`
+                ]
+            }
+        }
+    })
+);
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     limit: 100, // Maximum 100 requests per IP

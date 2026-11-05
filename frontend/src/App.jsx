@@ -1,5 +1,4 @@
-
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
 import EmailList from "./components/EmailList.jsx";
 import ThemeToggle from "./components/ThemeToggle.jsx";
@@ -80,31 +79,61 @@ function App() {
     const [protectedEmailsLoading, setProtectedEmailsLoading] = useState(false);
     const [protectedEmailsError, setProtectedEmailsError] = useState("");
 
-    const popupRef = useRef(null);
 
     const isAuthenticated = Boolean(authToken && authUser);
 
+
+
     useEffect(() => {
-        const handleAuthMessage = (event) => {
-            if (event.origin !== BACKEND_ORIGIN) {
-                return;
-            }
+        const params = new URLSearchParams(window.location.search);
+        const oauthStatus = params.get("oauth");
 
-            if (
-                !popupRef.current ||
-                event.source !== popupRef.current
-            ) {
-                return;
-            }
+        if (!oauthStatus) {
+            return;
+        }
 
-            const result = event.data;
+        // Remove OAuth query parameters from the address bar.
+        window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname
+        );
 
-            if (
-                result?.type === "oauth-success" &&
-                result.token &&
-                result.user
-            ) {
+        if (oauthStatus === "error") {
+            setAuthError("Google authentication failed. Please try again.");
+            setIsConnecting(false);
+            return;
+        }
+
+        if (oauthStatus !== "success") {
+            return;
+        }
+
+        let cancelled = false;
+
+        const exchangeHandoff = async () => {
+            try {
+                const response = await fetch("/api/auth/exchange", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    throw new Error(
+                        result.message || "Authentication exchange failed"
+                    );
+                }
+
+                if (cancelled) {
+                    return;
+                }
+
                 sessionStorage.setItem(TOKEN_KEY, result.token);
+
                 sessionStorage.setItem(
                     USER_KEY,
                     JSON.stringify(result.user)
@@ -114,29 +143,26 @@ function App() {
                 setAuthUser(result.user);
                 setAuthError("");
                 setIsConnecting(false);
-                popupRef.current = null;
-                return;
-            }
 
-            if (result?.type === "oauth-error") {
-                setAuthError(
-                    result.message || "Google sign-in failed."
-                );
+            } catch (error) {
+                if (!cancelled) {
+                    setAuthError(
+                        error.message || "Google sign-in failed."
+                    );
 
-                setIsConnecting(false);
-                popupRef.current = null;
+                    setIsConnecting(false);
+                }
             }
         };
 
-        window.addEventListener("message", handleAuthMessage);
+        exchangeHandoff();
 
         return () => {
-            window.removeEventListener(
-                "message",
-                handleAuthMessage
-            );
+            cancelled = true;
         };
     }, []);
+
+
 
     // Fetch email and category statistics.
     useEffect(() => {
@@ -344,21 +370,7 @@ function App() {
         setAuthError("");
         setIsConnecting(true);
 
-        const popup = window.open(
-            `${BACKEND_ORIGIN}/api/auth/google`,
-            "clearmail-google-login",
-            "popup=yes,width=520,height=720"
-        );
-
-        if (!popup) {
-            setIsConnecting(false);
-            setAuthError(
-                "Sign-in popup was blocked. Allow popups and try again."
-            );
-            return;
-        }
-
-        popupRef.current = popup;
+        window.location.href = "/api/auth/google";
     };
 
     const handleSignOut = () => {
@@ -378,11 +390,7 @@ function App() {
         setAuthError("");
         setIsConnecting(false);
 
-        if (popupRef.current && !popupRef.current.closed) {
-            popupRef.current.close();
-        }
 
-        popupRef.current = null;
     };
 
     const displayStats = baseStats.map((stat, index) => {
